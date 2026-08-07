@@ -1,0 +1,13 @@
+[Unit]
+Description=Motorcycle Dashboard Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/motorcycle-dashboard
+ExecStart=/usr/bin/python3 /opt/motorcycle-dashboard/backend/run.py
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target

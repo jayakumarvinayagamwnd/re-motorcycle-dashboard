@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Motorcycle Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/bootstrap.min.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body>
+  <main class="dashboard-shell">
+    <section class="dashboard-card" aria-label="Motorcycle Dashboard">
+      <header class="dashboard-header">
+        <h1>Motorcycle Dashboard</h1>
+      </header>
+
+      <section class="camera-grid" id="camera-panel" aria-label="Camera feeds">
+        <article class="camera-tile" id="camera-1" role="button" tabindex="0" aria-label="Camera 1 fullscreen">
+          <span class="camera-label">Camera 1</span>
+          <img class="camera-stream" id="camera-1-stream" src="" alt="Camera 1 stream" hidden />
+          <p class="camera-state" id="camera-1-state">Offline</p>
+          <p class="camera-source" id="camera-1-source">none</p>
+        </article>
+        <article class="camera-tile" id="camera-2" role="button" tabindex="0" aria-label="Camera 2 fullscreen">
+          <span class="camera-label">Camera 2</span>
+          <img class="camera-stream" id="camera-2-stream" src="" alt="Camera 2 stream" hidden />
+          <p class="camera-state" id="camera-2-state">Offline</p>
+          <p class="camera-source" id="camera-2-source">none</p>
+        </article>
+      </section>
+
+      <section class="speed-cluster" id="speed-panel" aria-label="Speed">
+        <p class="speed-number" id="speed-value">72</p>
+        <p class="speed-unit">km/h</p>
+        <p class="speed-caption">SPEEDOMETER</p>
+      </section>
+
+      <section class="status-grid" id="status-panel" aria-label="Status row">
+        <div class="status-item">
+          <span class="status-label">RPM</span>
+          <strong id="rpm-value">0</strong>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Fuel</span>
+          <strong id="fuel-value">0%</strong>
+        </div>
+        <div class="status-item status-lock">
+          <span class="status-label">GPS</span>
+          <strong id="gps-value">LOCK</strong>
+          <span class="status-sub" id="gps-coords">--</span>
+        </div>
+      </section>
+
+      <section class="trip-row" id="trip-panel" aria-label="Trip summary">
+        <div class="trip-metric">
+          <span class="trip-label">Trip</span>
+          <strong id="trip-value">12.3 km</strong>
+        </div>
+        <div class="trip-clock" id="clock-value">09:45 AM</div>
+      </section>
+    </section>
+  </main>
+
+  <!-- Fullscreen camera overlay -->
+  <div class="camera-overlay" id="camera-overlay">
+    <button class="camera-overlay-close" id="camera-overlay-close" aria-label="Close fullscreen">&times;</button>
+    <img class="camera-overlay-img" id="camera-overlay-img" src="" alt="Camera 1 fullscreen" />
+    <p class="camera-overlay-state" id="camera-overlay-state">Offline</p>
+  </div>
+
+  <script src="js/websocket.js"></script>
+  <script src="js/speedometer.js"></script>
+  <script src="js/trip.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

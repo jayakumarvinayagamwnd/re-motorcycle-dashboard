@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Motorcycle Dashboard Kiosk
+Exec=chromium --kiosk --noerrdialogs --disable-infobars http://localhost:5500
+X-GNOME-Autostart-enabled=true
