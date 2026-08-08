@@ -1,13 +1,15 @@
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from ..services.camera_service import (
     CAMERA_URL,
+    capture_snapshot,
     decrement_active_streams,
     get_camera_status,
     increment_active_streams,
     is_camera_online,
+    save_snapshot_bytes,
 )
 
 router = APIRouter(prefix="/camera", tags=["camera"])
@@ -16,6 +18,24 @@ router = APIRouter(prefix="/camera", tags=["camera"])
 @router.get("/status")
 def camera_status() -> dict:
     return get_camera_status()
+
+
+@router.post("/capture")
+async def camera_capture(file: UploadFile | None = File(default=None)) -> dict:
+    """Save a captured JPEG frame to data/capture/.
+
+    If a file is uploaded, it is saved directly. Otherwise, the backend
+    captures a frame from the camera stream itself.
+    """
+    try:
+        if file is not None:
+            jpeg_data = await file.read()
+            return save_snapshot_bytes(jpeg_data)
+        return await capture_snapshot()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.get("/stream")
