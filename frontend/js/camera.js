@@ -1,216 +1,167 @@
 // Use the FastAPI proxy to avoid CORS / mixed-content issues
-const CAMERA_1_STREAM_URL = `http://${window.location.hostname}:8000/api/camera/stream`;
-const CAMERA_2_STREAM_URL = CAMERA_1_STREAM_URL;
-const CAMERA_CAPTURE_URL = `http://${window.location.hostname}:8000/api/camera/capture`;
+const CAMERA_1_STREAM_URL = `http://${window.location.hostname}:8000/api/camera/1/stream`;
+const CAMERA_2_STREAM_URL = `http://${window.location.hostname}:8000/api/camera/2/stream`;
+const CAMERA_CAPTURE_URL = (cameraId) => `http://${window.location.hostname}:8000/api/camera/${cameraId}/capture`;
+const CAMERA_RECORD_URL = (cameraId) => `http://${window.location.hostname}:8000/api/camera/${cameraId}/record`;
 
-async function captureFrame(cameraId) {
-  const streamNode = document.getElementById(`${cameraId}-stream`);
-  if (!streamNode || streamNode.hidden) {
-    console.warn(`Cannot capture ${cameraId}: stream is not active`);
-    return;
-  }
+const camera = {
+  capture: async (cameraId) => {
+    try {
+      if (![1, 2].includes(cameraId)) {
+        console.error(`Invalid camera ID: ${cameraId}`);
+        return;
+      }
 
-  const button = document.getElementById(`${cameraId}-snapshot`);
-  if (button) {
-    button.disabled = true;
-  }
+      var cameraPosition = { "camera": "front" };
+      if (cameraId === 1) {
+        cameraPosition.camera = "front";
+      }
 
-  try {
-    // Read the current frame from the live <img> element
-    const captureCanvas = document.createElement("canvas");
-    captureCanvas.width = streamNode.naturalWidth || streamNode.width;
-    captureCanvas.height = streamNode.naturalHeight || streamNode.height;
-    const ctx = captureCanvas.getContext("2d");
-    ctx.drawImage(streamNode, 0, 0);
-    const jpegBlob = await new Promise((resolve) => {
-      captureCanvas.toBlob(resolve, "image/jpeg", 0.85);
-    });
-    if (!jpegBlob) {
-      throw new Error("Failed to encode frame as JPEG");
+      if (cameraId === 2) {
+        cameraPosition.camera = "rear";
+      }
+
+      console.log(`Capturing camera ${cameraPosition.camera} frame...`);
+      const response = await fetch(CAMERA_CAPTURE_URL(cameraId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cameraPosition),
+      });
+      if (!response.ok) {
+        throw new Error((await response.json()).detail || "Capture request failed");
+      }
+      console.log(await response.json());
+    } catch (error) {
+      console.error(`Failed to capture camera ${cameraId}:`, error);
     }
+  },
 
-    const formData = new FormData();
-    formData.append("file", jpegBlob, `${cameraId}_snapshot.jpg`);
-
-    const response = await fetch(CAMERA_CAPTURE_URL, {
-      method: "POST",
-      body: formData,
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.detail || `HTTP ${response.status}`);
-    }
-    const result = await response.json();
-    console.log(`Snapshot saved: ${result.path}`);
-  } catch (error) {
-    console.error(`Failed to capture ${cameraId}:`, error);
-  } finally {
-    if (button) {
-      button.disabled = false;
-    }
-  }
-}
-
-function renderCameraStatus(isStreaming, cameraId = "camera-1", source = "none", streamUrl = null) {
-  const statusNode = document.getElementById(`${cameraId}-status`);
-  const statusTextNode = document.getElementById(`${cameraId}-status-text`);
-  const statusBadgeNode = document.getElementById(`${cameraId}-status-badge`);
-  const tileNode = document.getElementById(cameraId);
-  const streamNode = document.getElementById(`${cameraId}-stream`);
-  if (!statusNode || !tileNode) {
-    return;
-  }
-
-  if (statusBadgeNode) {
-    statusBadgeNode.textContent = source || "none";
-  }
-  if (statusTextNode) {
-    statusTextNode.textContent = isStreaming ? "Streaming" : "Offline";
-  }
-  statusNode.classList.toggle("btn-primary", isStreaming);
-  statusNode.classList.toggle("btn-info", !isStreaming);
-  tileNode.style.borderColor = isStreaming ? "#1f9d55" : "#d4dbe4";
-
-  if (streamNode) {
-    if (isStreaming && streamUrl) {
-      streamNode.src = streamUrl;
-      streamNode.hidden = false;
-    } else {
-      streamNode.src = "";
-      streamNode.hidden = true;
-    }
-  }
-
-  // Keep the fullscreen overlay in sync with the active camera tile
-  const overlayImg = document.getElementById("camera-overlay-img");
-  const overlayState = document.getElementById("camera-overlay-state");
-  const activeCamera = document.body.dataset.activeCamera || "camera-1";
-  if (cameraId === activeCamera) {
-    if (isStreaming && streamUrl) {
-      overlayImg.src = streamUrl;
-      overlayState.textContent = "Streaming";
-    } else {
-      overlayImg.src = "";
-      overlayState.textContent = "Offline";
-    }
-  }
-}
-
-function toggleRecording(buttonId) {
-  const button = document.getElementById(buttonId);
-  if (!button) {
-    return;
-  }
-  const isRecording = button.classList.toggle("btn-danger");
-  button.classList.toggle("btn-success", !isRecording);
-  const label = button.querySelector(".rec-label");
-  if (label) {
-    label.textContent = isRecording ? "Stop" : "Recording";
-  }
-  const dot = button.querySelector(".rec-dot");
-  if (dot) {
-    dot.classList.toggle("recording-active", isRecording);
-  }
-}
-
-function openCameraOverlay(cameraId = "camera-1") {
-  const overlay = document.getElementById("camera-overlay");
-  const overlayImg = document.getElementById("camera-overlay-img");
-  const tileStream = document.getElementById(`${cameraId}-stream`);
-
-  if (!overlay || !overlayImg) {
-    return;
-  }
-
-  // Only allow opening fullscreen when the camera is streaming
-  if (tileStream && tileStream.hidden) {
-    return;
-  }
-
-  document.body.dataset.activeCamera = cameraId;
-  overlayImg.alt = `${cameraId === "camera-2" ? "Camera 2" : "Camera 1"} fullscreen`;
-  overlay.classList.add("open");
-  document.body.style.overflow = "hidden";
-}
-
-function closeCameraOverlay() {
-  const overlay = document.getElementById("camera-overlay");
-  if (!overlay) {
-    return;
-  }
-  overlay.classList.remove("open");
-  document.body.style.overflow = "";
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  const camera1Tile = document.getElementById("camera-1");
-  const camera2Tile = document.getElementById("camera-2");
-  const overlayClose = document.getElementById("camera-overlay-close");
-  const overlay = document.getElementById("camera-overlay");
-
-  const bindTile = (tile, cameraId) => {
-    if (!tile) {
+  toggleRecording: async (cameraId) => {
+    const button = document.getElementById(`camera-${cameraId}-recording`);
+    if (!button) {
       return;
     }
-    tile.addEventListener("click", () => openCameraOverlay(cameraId));
-    tile.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openCameraOverlay(cameraId);
+
+    if (button.classList.contains("recording")) {
+      return;
+    }
+
+    button.classList.add("recording");
+    button.title = "Stop Recording";
+    const icon = button.querySelector("i");
+    if (icon) {
+      icon.classList.remove("bi-record-circle");
+      icon.classList.add("bi-stop-circle");
+    }
+    button.disabled = true;
+    console.info(`Camera ${cameraId} 30-second recording started`);
+
+    try {
+      const response = await fetch(CAMERA_RECORD_URL(cameraId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ camera: cameraId === 1 ? "front" : "rear" }),
+      });
+      if (!response.ok) {
+        throw new Error((await response.json()).detail || "Recording request failed");
       }
-    });
-  };
-
-  bindTile(camera1Tile, "camera-1");
-  bindTile(camera2Tile, "camera-2");
-
-  // Snapshot buttons
-  const snapshot1 = document.getElementById("camera-1-snapshot");
-  const snapshot2 = document.getElementById("camera-2-snapshot");
-  if (snapshot1) {
-    snapshot1.addEventListener("click", (event) => {
-      event.stopPropagation();
-      captureFrame("camera-1");
-    });
-  }
-  if (snapshot2) {
-    snapshot2.addEventListener("click", (event) => {
-      event.stopPropagation();
-      captureFrame("camera-2");
-    });
-  }
-
-  // Recording toggle buttons
-  const recording1 = document.getElementById("camera-1-recording");
-  const recording2 = document.getElementById("camera-2-recording");
-  if (recording1) {
-    recording1.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleRecording("camera-1-recording");
-    });
-  }
-  if (recording2) {
-    recording2.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleRecording("camera-2-recording");
-    });
-  }
-
-  if (overlayClose) {
-    overlayClose.addEventListener("click", closeCameraOverlay);
-  }
-
-  if (overlay) {
-    overlay.addEventListener("click", (event) => {
-      if (event.target === overlay) {
-        closeCameraOverlay();
+      console.info(`Camera ${cameraId} recording stopped`, await response.json());
+    } catch (error) {
+      console.error(`Camera ${cameraId} recording failed`, error);
+    } finally {
+      button.disabled = false;
+      button.classList.remove("recording");
+      button.title = "Start Recording";
+      if (icon) {
+        icon.classList.remove("bi-stop-circle");
+        icon.classList.add("bi-record-circle");
       }
-    });
-  }
+    }
+  },
+
+  openFullscreen: (cameraId) => {
+    const streamNode = document.getElementById(`camera-${cameraId}-stream`);
+    const overlay = document.getElementById("camera-overlay");
+    const overlayStream = document.getElementById("camera-overlay-stream");
+    const overlayTitle = document.getElementById("camera-overlay-title");
+
+    if (!streamNode?.src || streamNode.hidden || !overlay || !overlayStream) {
+      console.warn(`Cannot open Camera ${cameraId}: stream is not active`);
+      return;
+    }
+
+    overlayStream.src = streamNode.currentSrc || streamNode.src;
+    overlayStream.alt = `Camera ${cameraId} fullscreen stream`;
+    if (overlayTitle) {
+      overlayTitle.textContent = `Camera ${cameraId}`;
+    }
+    overlay.classList.add("open");
+    document.body.classList.add("camera-overlay-open");
+  },
+
+  closeFullscreen: () => {
+    const overlay = document.getElementById("camera-overlay");
+    const overlayStream = document.getElementById("camera-overlay-stream");
+    if (!overlay) {
+      return;
+    }
+
+    overlay.classList.remove("open");
+    document.body.classList.remove("camera-overlay-open");
+    if (overlayStream) {
+      overlayStream.src = "";
+    }
+  },
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("camera-overlay-close")?.addEventListener("click", () => {
+    camera.closeFullscreen();
+  });
+
+  document.getElementById("camera-overlay")?.addEventListener("click", (event) => {
+    if (event.target.id === "camera-overlay") {
+      camera.closeFullscreen();
+    }
+  });
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      closeCameraOverlay();
+      camera.closeFullscreen();
     }
   });
 });
+
+function renderCameraStatus(isStreaming, cameraId, source, streamUrl) {
+  const streamNode = document.getElementById(`camera-${cameraId}-stream`);
+  const placeholderNode = document.getElementById(`camera-${cameraId}-placeholder`);
+  const liveIndicator = streamNode?.closest(".camera-card")?.querySelector(".camera-live");
+  const liveDot = liveIndicator?.querySelector(".live-dot");
+
+  if (streamNode) {
+    if (streamUrl) {
+      // Only set src once so the browser doesn't reload the MJPEG stream on every poll
+      if (streamNode.src !== streamUrl) {
+        streamNode.src = streamUrl;
+      }
+      streamNode.hidden = false;
+      if (placeholderNode) {
+        placeholderNode.style.display = "none";
+      }
+    } else {
+      streamNode.src = "";
+      streamNode.hidden = true;
+      if (placeholderNode) {
+        placeholderNode.style.display = "block";
+      }
+    }
+  }
+
+  if (liveIndicator) {
+    liveIndicator.style.display = isStreaming ? "flex" : "none";
+  }
+  if (liveDot) {
+    liveDot.style.background = isStreaming ? "#00d6a3" : "#666";
+    liveDot.style.boxShadow = isStreaming ? "0 0 8px rgba(0,214,163,0.8)" : "none";
+  }
+}

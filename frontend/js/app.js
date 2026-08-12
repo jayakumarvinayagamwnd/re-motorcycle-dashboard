@@ -10,7 +10,6 @@ const CAMERA_INTERVAL_MS = 2000;
 const TRIP_INTERVAL_MS = 2000;
 
 document.addEventListener("DOMContentLoaded", () => {
-  startClock();
   // Start separate polling loop per endpoint so slow endpoints don't block others
   startPolling("telemetry", TELEMETRY_API, TELEMETRY_INTERVAL_MS, applyTelemetry);
   startPolling("gps", GPS_API, GPS_INTERVAL_MS, applyGps);
@@ -27,17 +26,21 @@ function applyTelemetry(data) {
   }
 
   const fuelNode = document.getElementById("fuel-value");
+  const batteryLevel = document.getElementById("batteryLevel");
   if (fuelNode) {
     const fuel = Math.max(0, Math.min(100, Math.round(data.fuel_percent)));
     fuelNode.textContent = `${fuel}%`;
+    if (batteryLevel) {
+      batteryLevel.style.width = `${fuel}%`;
+    }
   }
 }
 
 function applyGps(data) {
   const gpsNode = document.getElementById("gps-value");
-  const coordsNode = document.getElementById("gps-coords");
+  const coordsNode = document.getElementById("gpsCoordinates");
   if (gpsNode) {
-    gpsNode.textContent = "LOCK";
+    gpsNode.textContent = "Connected";
   }
   if (coordsNode) {
     coordsNode.textContent = `${data.lat.toFixed(4)}, ${data.lon.toFixed(4)}`;
@@ -45,8 +48,8 @@ function applyGps(data) {
 }
 
 function applyCamera(data) {
-  renderCameraStatus(data.is_streaming, "camera-1", data.source, CAMERA_1_STREAM_URL);
-  renderCameraStatus(data.is_streaming, "camera-2", data.source, CAMERA_2_STREAM_URL);
+  renderCameraStatus(data.is_streaming, 1, data.source, CAMERA_1_STREAM_URL);
+  renderCameraStatus(data.is_streaming, 2, data.source, CAMERA_2_STREAM_URL);
 }
 
 function applyTrip(data) {
@@ -73,23 +76,4 @@ function startPolling(name, url, intervalMs, apply) {
 
   poll();
   window.setInterval(poll, intervalMs);
-}
-
-function startClock() {
-  const clockNode = document.getElementById("clock-value");
-  if (!clockNode) {
-    return;
-  }
-
-  const updateClock = () => {
-    const now = new Date();
-    clockNode.textContent = now.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  updateClock();
-  window.setInterval(updateClock, 1000);
 }

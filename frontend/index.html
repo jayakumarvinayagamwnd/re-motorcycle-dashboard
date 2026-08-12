@@ -1,106 +1,669 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Motorcycle Dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/bootstrap.min.css" />
-  <link rel="stylesheet" href="css/dashboard.css" />
-</head>
-<body>
-  <main class="dashboard-shell">
-    <section class="dashboard-card" aria-label="Motorcycle Dashboard">
-      <header class="dashboard-header">
-        <h1>Motorcycle Dashboard</h1>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+      Motorcycle Dashboard
+    </title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+      * {
+        box-sizing:border-box
+      }
+      html,body {
+        margin:0;
+        padding:0;
+        width:100%;
+        min-height:100%
+      }
+      body {
+        font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+        color:#ffffff;
+        min-height:100vh;
+        background:radial-gradient( circle at top left,rgba(0,190,155,0.12),transparent 35% ),radial-gradient( circle at bottom right,rgba(0,130,120,0.10),transparent 40% ),linear-gradient( 145deg,#031b1a,#02110f 55%,#010b0c );
+        overflow-x:hidden
+      }
+      .dashboard {
+        width:100%;
+        max-width:900px;
+        min-height:100vh;
+        margin:auto;
+        padding:20px 16px 30px
+      }
+      .glass-card {
+        background:linear-gradient( 145deg,rgba(8,61,55,0.72),rgba(3,35,33,0.62) );
+        border:1px solid rgba(255,255,255,0.06);
+        backdrop-filter:blur(15px);
+        -webkit-backdrop-filter:blur(15px);
+        box-shadow:0 12px 30px rgba(0,0,0,0.28),inset 0 1px 0 rgba(255,255,255,0.05)
+      }
+      .dashboard-title {
+        text-align:center;
+        margin-bottom:15px;
+        padding:15px;
+        border-radius:22px
+      }
+      .dashboard-title h1 {
+        margin:0;
+        font-size:21px;
+        font-weight:600;
+        letter-spacing:1px;
+        text-transform:uppercase
+      }
+      .subtitle {
+        margin-top:5px;
+        font-size:10px;
+        letter-spacing:1px;
+        color:rgba(255,255,255,0.40)
+      }
+      .camera-section {
+        margin-bottom:15px
+      }
+      .camera-card {
+        position:relative;
+        width:100%;
+        height:220px;
+        overflow:hidden;
+        border-radius:20px;
+        background:#031c1b;
+        border:1px solid rgba(255,255,255,0.06);
+        box-shadow:0 12px 30px rgba(0,0,0,0.30),inset 0 1px 0 rgba(255,255,255,0.04)
+      }
+      .camera-feed {
+        width:100%;
+        height:100%;
+        display:block;
+        object-fit:cover;
+        background:linear-gradient( 145deg,#062a27,#031615 )
+      }
+      .camera-stream {
+        width:100%;
+        height:100%;
+        display:block;
+        object-fit:cover;
+        background:linear-gradient( 145deg,#062a27,#031615 )
+      }
+      .camera-header {
+        position:absolute;
+        top:0;
+        left:0;
+        right:0;
+        z-index:10;
+        padding:10px 12px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        background:linear-gradient( 180deg,rgba(0,0,0,0.70),rgba(0,0,0,0) )
+      }
+      .camera-name {
+        font-size:11px;
+        font-weight:600;
+        text-transform:uppercase;
+        letter-spacing:0.7px
+      }
+      .camera-position {
+        margin-left:5px;
+        font-size:10px;
+        color:rgba(255,255,255,0.45)
+      }
+      .camera-live {
+        display:flex;
+        align-items:center;
+        gap:5px;
+        font-size:9px;
+        font-weight:600;
+        color:#00d6a3
+      }
+      .live-dot {
+        width:7px;
+        height:7px;
+        border-radius:50%;
+        background:#00d6a3;
+        box-shadow:0 0 8px rgba(0,214,163,0.8);
+        animation:livePulse 1.5s infinite
+      }
+      @keyframes livePulse {
+        0% {
+          opacity:1
+        }
+        50% {
+          opacity:0.35
+        }
+        100% {
+          opacity:1
+        }
+      }
+      .camera-placeholder {
+        position:absolute;
+        top:50%;
+        left:50%;
+        transform:translate(-50%,-50%);
+        text-align:center;
+        color:rgba(255,255,255,0.30);
+        pointer-events:none
+      }
+      .camera-placeholder i {
+        display:block;
+        font-size:35px;
+        margin-bottom:8px
+      }
+      .camera-placeholder span {
+        font-size:11px;
+        letter-spacing:1px
+      }
+      .camera-footer {
+        position:absolute;
+        bottom:0;
+        left:0;
+        right:0;
+        z-index:10;
+        padding:8px 10px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        background:linear-gradient( 0deg,rgba(0,0,0,0.75),rgba(0,0,0,0) )
+      }
+      .camera-footer-label {
+        font-size:9px;
+        color:rgba(255,255,255,0.50)
+      }
+      .camera-controls {
+        display:flex;
+        align-items:center;
+        gap:6px
+      }
+      .camera-button {
+        width:32px;
+        height:32px;
+        padding:0;
+        border:1px solid rgba(255,255,255,0.15);
+        border-radius:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        color:#ffffff;
+        background:rgba(0,0,0,0.55);
+        backdrop-filter:blur(8px);
+        -webkit-backdrop-filter:blur(8px);
+        cursor:pointer;
+        transition:transform 0.15s ease,background 0.15s ease,border-color 0.15s ease
+      }
+      .camera-button:hover {
+        background:rgba(0,196,154,0.25);
+        border-color:rgba(0,214,163,0.50);
+        transform:scale(1.08)
+      }
+      .camera-button:active {
+        transform:scale(0.92)
+      }
+      .camera-button i {
+        font-size:14px
+      }
+      .camera-overlay {
+        position:fixed;
+        inset:0;
+        z-index:1050;
+        display:none;
+        align-items:center;
+        justify-content:center;
+        padding:20px;
+        background:rgba(0,0,0,0.88)
+      }
+      .camera-overlay.open {
+        display:flex
+      }
+      .camera-overlay-content {
+        position:relative;
+        width:min(100%,1200px);
+        max-height:100%;
+        overflow:hidden;
+        border:1px solid rgba(255,255,255,0.15);
+        border-radius:16px;
+        background:#031c1b;
+        box-shadow:0 20px 60px rgba(0,0,0,0.55)
+      }
+      .camera-overlay-stream {
+        display:block;
+        width:100%;
+        max-height:calc(100vh - 40px);
+        object-fit:contain
+      }
+      .camera-overlay-title {
+        position:absolute;
+        top:14px;
+        left:16px;
+        z-index:1;
+        font-size:12px;
+        font-weight:600;
+        letter-spacing:0.8px;
+        text-transform:uppercase;
+        text-shadow:0 1px 4px #000
+      }
+      .camera-overlay-close {
+        position:absolute;
+        top:10px;
+        right:10px;
+        z-index:1
+      }
+      body.camera-overlay-open {
+        overflow:hidden
+      }
+      .record-button {
+        color:#ff6868
+      }
+      .record-button:hover {
+        color:#ff4444;
+        background:rgba(255,60,60,0.20);
+        border-color:rgba(255,80,80,0.50)
+      }
+      .record-button.recording {
+        color:#ffffff;
+        background:rgba(210,30,30,0.75);
+        border-color:rgba(255,80,80,0.90);
+        animation:recordingPulse 1.2s infinite
+      }
+      @keyframes recordingPulse {
+        0% {
+          box-shadow:0 0 0 rgba(255,50,50,0)
+        }
+        50% {
+          box-shadow:0 0 12px rgba(255,50,50,0.65)
+        }
+        100% {
+          box-shadow:0 0 0 rgba(255,50,50,0)
+        }
+      }
+      .speed-section {
+        text-align:center;
+        margin-bottom:15px;
+        padding:30px 15px 25px;
+        border-radius:26px
+      }
+      .speed-value {
+        display:flex;
+        align-items:baseline;
+        justify-content:center;
+        gap:8px
+      }
+      .speed-number {
+        font-size:90px;
+        font-weight:700;
+        line-height:0.9;
+        letter-spacing:-4px;
+        text-shadow:0 5px 25px rgba(0,0,0,0.45)
+      }
+      .speed-unit {
+        font-size:20px;
+        font-weight:500;
+        color:rgba(255,255,255,0.55)
+      }
+      .rpm {
+        margin-top:15px;
+        font-size:16px;
+        letter-spacing:1px;
+        color:rgba(255,255,255,0.55)
+      }
+      .rpm-value {
+        color:#00c49a;
+        font-weight:600
+      }
+      .speed-status {
+        margin-top:15px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:6px;
+        font-size:9px;
+        color:rgba(255,255,255,0.35)
+      }
+      .status-dot {
+        width:6px;
+        height:6px;
+        border-radius:50%;
+        background:#00c49a;
+        box-shadow:0 0 7px rgba(0,196,154,0.7)
+      }
+      .info-card {
+        min-height:105px;
+        padding:16px;
+        border-radius:20px;
+        display:flex;
+        align-items:center;
+        gap:13px
+      }
+      .info-icon {
+        width:44px;
+        height:44px;
+        flex-shrink:0;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:50%;
+        font-size:20px;
+        color:#00c49a;
+        background:rgba(0,180,150,0.13)
+      }
+      .info-label {
+        font-size:11px;
+        color:rgba(255,255,255,0.45);
+        text-transform:uppercase;
+        letter-spacing:0.5px
+      }
+      .info-value {
+        margin-top:4px;
+        font-size:18px;
+        font-weight:600
+      }
+      .info-status {
+        margin-top:3px;
+        font-size:10px;
+        color:#00c49a
+      }
+      .battery-progress {
+        width:100%;
+        height:5px;
+        margin-top:8px;
+        overflow:hidden;
+        border-radius:10px;
+        background:rgba(255,255,255,0.08)
+      }
+      .battery-level {
+        width:65%;
+        height:100%;
+        border-radius:10px;
+        background:linear-gradient( 90deg,#00a982,#00d6a3 );
+        box-shadow:0 0 8px rgba(0,214,163,0.4)
+      }
+      .gps-coordinates {
+        margin-top:3px;
+        font-size:10px;
+        color:rgba(255,255,255,0.40)
+      }
+      .trip-card {
+        margin-top:10px;
+        padding:18px;
+        border-radius:22px
+      }
+      .trip-header {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        margin-bottom:8px
+      }
+      .trip-title {
+        font-size:11px;
+        text-transform:uppercase;
+        letter-spacing:0.6px;
+        color:rgba(255,255,255,0.45)
+      }
+      .trip-time {
+        font-size:10px;
+        color:rgba(255,255,255,0.35)
+      }
+      .trip-content {
+        display:flex;
+        align-items:center;
+        justify-content:space-between
+      }
+      .trip-distance {
+        font-size:30px;
+        font-weight:700
+      }
+      .trip-unit {
+        margin-left:5px;
+        font-size:14px;
+        color:rgba(255,255,255,0.50)
+      }
+      .trip-icon {
+        width:45px;
+        height:45px;
+        border-radius:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        color:#00c49a;
+        background:rgba(0,180,150,0.13);
+        font-size:20px
+      }
+      @media (min-width:768px) {
+        .dashboard {
+          padding:30px 25px 40px
+        }
+        .dashboard-title h1 {
+          font-size:25px
+        }
+        .camera-card {
+          height:270px
+        }
+        .speed-number {
+          font-size:110px
+        }
+        .info-card {
+          min-height:120px;
+          padding:20px
+        }
+      }
+      @media (max-width:500px) {
+        .dashboard {
+          padding:12px 10px 25px
+        }
+        .dashboard-title {
+          padding:12px;
+          margin-bottom:10px
+        }
+        .dashboard-title h1 {
+          font-size:17px
+        }
+        .camera-card {
+          height:145px;
+          border-radius:17px
+        }
+        .speed-section {
+          padding:28px 15px 25px
+        }
+        .speed-number {
+          font-size:67px;
+          letter-spacing:-3px
+        }
+        .speed-unit {
+          font-size:16px
+        }
+        .info-card {
+          min-height:95px;
+          padding:13px;
+          border-radius:18px
+        }
+        .info-icon {
+          width:38px;
+          height:38px;
+          font-size:17px
+        }
+        .info-value {
+          font-size:16px
+        }
+        .camera-button {
+          width:28px;
+          height:28px
+        }
+        .camera-button i {
+          font-size:12px
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="dashboard">
+      <header class="dashboard-title glass-card">
+        <h1> Motorcycle Dashboard </h1>
       </header>
-
-      <section class="camera-grid" id="camera-panel" aria-label="Camera feeds">
-        <article class="camera-tile" id="camera-1" role="button" tabindex="0" aria-label="Camera 1 fullscreen">
-          <span class="camera-label">Camera 1</span>
-          <img class="camera-stream" id="camera-1-stream" src="" alt="Camera 1 stream" hidden />
-          <div class="camera-actions">
-            <button type="button" class="btn btn-info btn-sm camera-status" id="camera-1-status">
-              <svg class="cam-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M0 5a2 2 0 0 1 2-2h7.5a2 2 0 0 1 1.983 1.738l3.11-1.382A1 1 0 0 1 16 4.269v7.462a1 1 0 0 1-1.406.913l-3.111-1.382A2 2 0 0 1 9.5 13H2a2 2 0 0 1-2-2V5z"/></svg>
-              <span id="camera-1-status-text">Offline</span>
-              <span class="badge badge-light" id="camera-1-status-badge">none</span>
-            </button>
-            <button type="button" class="btn btn-primary btn-sm camera-snapshot" id="camera-1-snapshot">
-              <svg class="cam-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M15 12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1.172a3 3 0 0 0 2.12-.879l.83-.828A1 1 0 0 1 6.827 3h2.344a1 1 0 0 1 .707.293l.828.828A3 3 0 0 0 12.828 5H14a1 1 0 0 1 1 1v6zM2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4H2z"/><path d="M8 11a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5zm0 1a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>
-              Snapshot
-            </button>
-            <button type="button" class="btn btn-success btn-sm camera-recording" id="camera-1-recording">
-              <svg class="cam-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path class="rec-dot" d="M11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
-              <span class="rec-label">Recording</span>
-            </button>
+      <section class="camera-section" id="camera-panel">
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="camera-card" id="camera-1">
+              <div class="camera-header">
+                <div>
+                  <span class="camera-name"> Camera 1 </span>
+                  <span class="camera-position"></span>
+                </div>
+                <div class="camera-live" id="camera-1-status">
+                  <span class="live-dot"> </span> LIVE
+                </div>
+              </div>
+              <img class="camera-stream" id="camera-1-stream" src="" alt="Camera 1 stream" hidden />
+              <div class="camera-footer">
+                <span class="camera-footer-label"></span>
+                <div class="camera-controls">
+                  <button type="button" class="camera-button" title="Capture Image" onclick="camera.capture(1)">
+                    <i class="bi bi-camera"> </i>
+                  </button>
+                  <button id="camera-1-recording" type="button" class="camera-button record-button" title="Start Recording" onclick="camera.toggleRecording(1)">
+                    <i class="bi bi-record-circle"> </i>
+                  </button>
+                  <button type="button" class="camera-button" title="View fullscreen" aria-label="View Camera 1 fullscreen" onclick="camera.openFullscreen(1)">
+                    <i class="bi bi-arrows-fullscreen"> </i>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </article>
-        <article class="camera-tile" id="camera-2" role="button" tabindex="0" aria-label="Camera 2 fullscreen">
-          <span class="camera-label">Camera 2</span>
-          <img class="camera-stream" id="camera-2-stream" src="" alt="Camera 2 stream" hidden />
-          <div class="camera-actions">
-            <button type="button" class="btn btn-info btn-sm camera-status" id="camera-2-status">
-              <svg class="cam-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M0 5a2 2 0 0 1 2-2h7.5a2 2 0 0 1 1.983 1.738l3.11-1.382A1 1 0 0 1 16 4.269v7.462a1 1 0 0 1-1.406.913l-3.111-1.382A2 2 0 0 1 9.5 13H2a2 2 0 0 1-2-2V5z"/></svg>
-              <span id="camera-2-status-text">Offline</span>
-              <span class="badge badge-light" id="camera-2-status-badge">none</span>
-            </button>
-            <button type="button" class="btn btn-primary btn-sm camera-snapshot" id="camera-2-snapshot">
-              <svg class="cam-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M15 12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1.172a3 3 0 0 0 2.12-.879l.83-.828A1 1 0 0 1 6.827 3h2.344a1 1 0 0 1 .707.293l.828.828A3 3 0 0 0 12.828 5H14a1 1 0 0 1 1 1v6zM2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4H2z"/><path d="M8 11a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5zm0 1a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>
-              Snapshot
-            </button>
-            <button type="button" class="btn btn-success btn-sm camera-recording" id="camera-2-recording">
-              <svg class="cam-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path class="rec-dot" d="M11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
-              <span class="rec-label">Recording</span>
-            </button>
+          <div class="col-6">
+            <div class="camera-card" id="camera-2">
+              <div class="camera-header">
+                <div>
+                  <span class="camera-name"> Camera 2 </span>
+                  <span class="camera-position"></span>
+                </div>
+                <div class="camera-live" id="camera-2-status">
+                  <span class="live-dot"> </span> LIVE
+                </div>
+              </div>
+              <img class="camera-stream" id="camera-2-stream" src="" alt="Camera 2 stream" hidden />
+              <div class="camera-footer">
+                <span class="camera-footer-label"></span>
+                <div class="camera-controls">
+                  <button type="button" class="camera-button" title="Capture Image" onclick="camera.capture(2)">
+                    <i class="bi bi-camera"> </i>
+                  </button>
+                  <button id="camera-2-recording" type="button" class="camera-button record-button" title="Start Recording" onclick="camera.toggleRecording(2)">
+                    <i class="bi bi-record-circle"> </i>
+                  </button>
+                  <button type="button" class="camera-button" title="View fullscreen" aria-label="View Camera 2 fullscreen" onclick="camera.openFullscreen(2)">
+                    <i class="bi bi-arrows-fullscreen"> </i>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </article>
-      </section>
-
-      <section class="speed-cluster" id="speed-panel" aria-label="Speed">
-        <p class="speed-number" id="speed-value">72</p>
-        <p class="speed-unit">km/h</p>
-        <p class="speed-caption">SPEEDOMETER</p>
-      </section>
-
-      <section class="status-grid" id="status-panel" aria-label="Status row">
-        <div class="status-item">
-          <span class="status-label">RPM</span>
-          <strong id="rpm-value">0</strong>
-        </div>
-        <div class="status-item">
-          <span class="status-label">Fuel</span>
-          <strong id="fuel-value">0%</strong>
-        </div>
-        <div class="status-item status-lock">
-          <span class="status-label">GPS</span>
-          <strong id="gps-value">LOCK</strong>
-          <span class="status-sub" id="gps-coords">--</span>
         </div>
       </section>
-
-      <section class="trip-row" id="trip-panel" aria-label="Trip summary">
-        <div class="trip-metric">
-          <span class="trip-label">Trip</span>
-          <strong id="trip-value">12.3 km</strong>
+      <section class="speed-section glass-card">
+        <div class="speed-value">
+          <span id="speed-value" class="speed-number">
+          </span>
+          <span class="speed-unit">
+            km/h
+          </span>
         </div>
-        <div class="trip-clock" id="clock-value">09:45 AM</div>
+        <div class="rpm">
+          <span id="rpm-value" class="rpm-value">
+          </span>
+          &nbsp;RPM
+        </div>
+        <div class="speed-status">
+          <span class="status-dot">
+          </span>
+          SPEED SENSOR CONNECTED
+        </div>
       </section>
-    </section>
-  </main>
-
-  <!-- Fullscreen camera overlay -->
-  <div class="camera-overlay" id="camera-overlay">
-    <button class="camera-overlay-close" id="camera-overlay-close" aria-label="Close fullscreen">&times;</button>
-    <img class="camera-overlay-img" id="camera-overlay-img" src="" alt="Camera 1 fullscreen" />
-    <p class="camera-overlay-state" id="camera-overlay-state">Offline</p>
-  </div>
-
-  <script src="js/websocket.js"></script>
-  <script src="js/speedometer.js"></script>
-  <script src="js/trip.js"></script>
-  <script src="js/camera.js"></script>
-  <script src="js/app.js"></script>
-</body>
+      <section>
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="info-card glass-card">
+              <div class="info-icon">
+                <i class="bi bi-battery-half">
+                </i>
+              </div>
+              <div class="flex-grow-1">
+                <div class="info-label">
+                  Battery
+                </div>
+                <div id="fuel-value" class="info-value">
+                  65%
+                </div>
+                <div class="battery-progress">
+                  <div id="batteryLevel" class="battery-level">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="info-card glass-card">
+              <div class="info-icon">
+                <i class="bi bi-geo-alt">
+                </i>
+              </div>
+              <div>
+                <div class="info-label">
+                  GPS
+                </div>
+                <div id="gps-value" class="info-value">
+                  Connected
+                </div>
+                <div id="gpsCoordinates" class="gps-coordinates">
+                  11.0168, 76.9558
+                </div>
+                <div class="info-status">
+                  <i class="bi bi-check-circle-fill">
+                  </i>
+                  Signal OK
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="trip-card glass-card">
+        <div class="trip-header">
+          <span class="trip-title">
+            Current Trip
+          </span>
+          <span id="tripTime" class="trip-time">
+            00:42:18
+          </span>
+        </div>
+        <div class="trip-content">
+          <div>
+            <span id="trip-value" class="trip-distance">
+            </span>
+          </div>
+          <div class="trip-icon">
+            <i class="bi bi-sign-turn-right">
+            </i>
+          </div>
+        </div>
+      </section>
+    </main>
+    <div class="camera-overlay" id="camera-overlay" role="dialog" aria-modal="true" aria-labelledby="camera-overlay-title">
+      <div class="camera-overlay-content">
+        <div class="camera-overlay-title" id="camera-overlay-title">Camera</div>
+        <button type="button" class="camera-button camera-overlay-close" id="camera-overlay-close" title="Close fullscreen view" aria-label="Close fullscreen view">
+          <i class="bi bi-x-lg"> </i>
+        </button>
+        <img class="camera-overlay-stream" id="camera-overlay-stream" src="" alt="Fullscreen camera stream">
+      </div>
+    </div>
+  </body>
+  <script src="js/websocket.js">
+  </script>
+  <script src="js/speedometer.js">
+  </script>
+  <script src="js/trip.js">
+  </script>
+  <script src="js/camera.js">
+  </script>
+  <script src="js/app.js">
+  </script>
 </html>
