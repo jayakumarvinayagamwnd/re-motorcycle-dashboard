@@ -16,3 +16,30 @@ function renderTrip(distanceKm, durationMin) {
     tripTime.textContent = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
 }
+
+function renderTripHistory(data) {
+  const container = document.getElementById("trip-history-list");
+  if (!container) return;
+
+  if (!data || data.length === 0) {
+    container.innerHTML = `<div class="trip-history-empty"><span>No trip records yet</span></div>`;
+    return;
+  }
+
+  container.innerHTML = data.map((trip) => {
+    const km = Number(trip.distance_km).toFixed(1);
+    return `
+      <div class="trip-history-item">
+        <span class="trip-history-name">${escapeHtml(trip.trim_name)}</span>
+        <span class="trip-history-km">${km} <small>km</small></span>
+        <span class="trip-history-date">${escapeHtml(trip.date)}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}

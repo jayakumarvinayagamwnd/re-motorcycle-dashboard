@@ -3,14 +3,15 @@ import logging
 import os
 import random
 import shutil
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 import httpx
 
+from ..config.settings import settings
 from ..models.camara import CamaraPosition, CamaraSaveStatus
 
-CAMERA_URL = "http://192.168.1.5/camera/stream"
 CAMERA_CHECK_INTERVAL_S = 5
 CAMERA_TIMEOUT_S = 2.0
 CAMERA_CAPTURE_READ_TIMEOUT_S = 15.0
@@ -23,14 +24,20 @@ RECORDING_DIR = Path(__file__).resolve().parents[3] / "data" / "recordings"
 
 logger = logging.getLogger(__name__)
 
-_camera_online = False
-_active_streams = 0
-_monitor_task: asyncio.Task | None = None
-_shared_stream_task: asyncio.Task | None = None
-_stream_subscribers: set[asyncio.Queue[bytes]] = set()
-_recording_subscribers: set[asyncio.Queue[bytes]] = set()
-_latest_jpeg: bytes | None = None
-_frame_available = asyncio.Event()
+
+@dataclass
+class CameraState:
+    """Per-camera runtime state."""
+    camera_id: int
+    url: str
+    online: bool = False
+    active_streams: int = 0
+    monitor_task: asyncio.Task | None = None
+    shared_stream_task: asyncio.Task | None = None
+    stream_subscribers: set[asyncio.Queue[bytes]] = field(default_factory=set)
+    recording_subscribers: set[asyncio.Queue[bytes]] = field(default_factory=set)
+    latest_jpeg: bytes | None = None
+    frame_available: asyncio.Event = field(default_factory=asyncio.Event)
 
 
 def _resolve_ffmpeg_command() -> str | None:
@@ -52,86 +59,98 @@ def _resolve_ffmpeg_command() -> str | None:
     return None
 
 
-async def _check_camera() -> bool:
+def _get_camera_state(camera_id: int) -> CameraState:
+    """Return the runtime state for a camera, creating it on first use."""
+    if camera_id not in _camera_states:
+        url = settings.camera_1_url if camera_id == 1 else settings.camera_2_url
+        _camera_states[camera_id] = CameraState(camera_id=camera_id, url=url)
+    return _camera_states[camera_id]
+
+
+_camera_states: dict[int, CameraState] = {}
+
+
+async def _check_camera(state: CameraState) -> bool:
     """Quick connectivity check: open the stream, read the first bytes, then close."""
     try:
         async with httpx.AsyncClient(timeout=CAMERA_TIMEOUT_S) as client:
-            async with client.stream("GET", CAMERA_URL) as response:
+            async with client.stream("GET", state.url) as response:
                 if response.status_code != 200:
                     return False
                 async for _ in response.aiter_bytes():
                     return True
                 return False
     except Exception as exc:  # noqa: BLE001
-        logger.debug("Camera connectivity check failed: %s", exc)
+        logger.debug("Camera %s connectivity check failed: %s", state.camera_id, exc)
         return False
 
 
-async def _monitor_camera() -> None:
+async def _monitor_camera(state: CameraState) -> None:
     """Background loop that probes the camera when no active streams are consuming it.
 
     Probing is skipped while streams are active to avoid competing with the
     stream connection for the camera's limited simultaneous connections.
     """
-    global _camera_online
     while True:
-        if _active_streams == 0:
-            _camera_online = await _check_camera()
-            if _camera_online:
-                logger.info("Camera is online")
+        if state.active_streams == 0:
+            state.online = await _check_camera(state)
+            if state.online:
+                logger.info("Camera %s is online", state.camera_id)
             else:
-                logger.warning("Camera is offline - will retry in %ss", CAMERA_CHECK_INTERVAL_S)
+                logger.warning(
+                    "Camera %s is offline - will retry in %ss",
+                    state.camera_id,
+                    CAMERA_CHECK_INTERVAL_S,
+                )
         await asyncio.sleep(CAMERA_CHECK_INTERVAL_S)
 
 
 def start_camera_monitor() -> None:
-    """Start the background camera monitor task (idempotent)."""
-    global _monitor_task
-    if _monitor_task is None or _monitor_task.done():
-        _monitor_task = asyncio.create_task(_monitor_camera())
+    """Start the background camera monitor tasks (idempotent)."""
+    for camera_id in (1, 2):
+        state = _get_camera_state(camera_id)
+        if state.monitor_task is None or state.monitor_task.done():
+            state.monitor_task = asyncio.create_task(_monitor_camera(state))
 
 
-def set_camera_online() -> None:
-    global _camera_online
-    _camera_online = True
+def set_camera_online(camera_id: int) -> None:
+    _get_camera_state(camera_id).online = True
 
 
-def set_camera_offline() -> None:
-    global _camera_online
-    _camera_online = False
+def set_camera_offline(camera_id: int) -> None:
+    _get_camera_state(camera_id).online = False
 
 
-def increment_active_streams() -> None:
-    global _active_streams
-    _active_streams += 1
-    set_camera_online()
+def increment_active_streams(camera_id: int) -> None:
+    state = _get_camera_state(camera_id)
+    state.active_streams += 1
+    state.online = True
 
 
-def decrement_active_streams() -> None:
-    global _active_streams
-    _active_streams = max(0, _active_streams - 1)
+def decrement_active_streams(camera_id: int) -> None:
+    state = _get_camera_state(camera_id)
+    state.active_streams = max(0, state.active_streams - 1)
 
 
-async def _read_shared_camera_stream() -> None:
+async def _read_shared_camera_stream(state: CameraState) -> None:
     """Read one upstream MJPEG connection and share it with all consumers."""
-    global _latest_jpeg
     stream_timeout = httpx.Timeout(None, connect=CAMERA_TIMEOUT_S)
 
-    increment_active_streams()
+    increment_active_streams(state.camera_id)
     try:
-        while _stream_subscribers or _recording_subscribers:
+        while state.stream_subscribers or state.recording_subscribers:
             frame_buffer = bytearray()
             try:
                 async with httpx.AsyncClient(timeout=stream_timeout) as client:
-                    async with client.stream("GET", CAMERA_URL) as response:
+                    async with client.stream("GET", state.url) as response:
                         if response.status_code != 200:
                             raise RuntimeError(
-                                f"Camera stream error: HTTP {response.status_code}"
+                                f"Camera {state.camera_id} stream error: HTTP {response.status_code}"
                             )
 
-                        set_camera_online()
+                        state.online = True
                         async for chunk in response.aiter_bytes():
-                            for subscriber in tuple(_stream_subscribers):
+                            for subscriber in tuple(state.stream_subscribers):
                                 try:
                                     subscriber.put_nowait(chunk)
                                 except asyncio.QueueFull:
@@ -154,77 +173,84 @@ async def _read_shared_camera_stream() -> None:
                                         del frame_buffer[:jpeg_start]
                                     break
 
-                                _latest_jpeg = bytes(frame_buffer[jpeg_start : jpeg_end + 2])
-                                _frame_available.set()
-                                for subscriber in tuple(_recording_subscribers):
+                                state.latest_jpeg = bytes(frame_buffer[jpeg_start : jpeg_end + 2])
+                                state.frame_available.set()
+                                for subscriber in tuple(state.recording_subscribers):
                                     try:
-                                        subscriber.put_nowait(_latest_jpeg)
+                                        subscriber.put_nowait(state.latest_jpeg)
                                     except asyncio.QueueFull:
                                         # Dropping a frame is preferable to blocking
                                         # the shared stream for a slow encoder.
                                         continue
                                 del frame_buffer[: jpeg_end + 2]
             except Exception as exc:  # noqa: BLE001
-                set_camera_offline()
-                logger.warning("Shared camera stream disconnected: %s", exc)
+                state.online = False
+                logger.warning(
+                    "Camera %s shared stream disconnected: %s",
+                    state.camera_id,
+                    exc,
+                )
 
-            if _stream_subscribers or _recording_subscribers:
+            if state.stream_subscribers or state.recording_subscribers:
                 await asyncio.sleep(1)
     finally:
-        decrement_active_streams()
+        decrement_active_streams(state.camera_id)
 
 
-def _ensure_shared_camera_stream() -> None:
+def _ensure_shared_camera_stream(camera_id: int) -> None:
     """Start the single upstream camera connection when needed."""
-    global _shared_stream_task
-    if _shared_stream_task is None or _shared_stream_task.done():
-        _shared_stream_task = asyncio.create_task(_read_shared_camera_stream())
+    state = _get_camera_state(camera_id)
+    if state.shared_stream_task is None or state.shared_stream_task.done():
+        state.shared_stream_task = asyncio.create_task(_read_shared_camera_stream(state))
 
 
-async def get_shared_camera_stream():
+async def get_shared_camera_stream(camera_id: int):
     """Yield MJPEG bytes from the shared upstream camera connection."""
+    state = _get_camera_state(camera_id)
     subscriber: asyncio.Queue[bytes] = asyncio.Queue(maxsize=16)
-    _stream_subscribers.add(subscriber)
-    _ensure_shared_camera_stream()
+    state.stream_subscribers.add(subscriber)
+    _ensure_shared_camera_stream(camera_id)
 
     try:
         while True:
             yield await subscriber.get()
     finally:
-        _stream_subscribers.discard(subscriber)
+        state.stream_subscribers.discard(subscriber)
 
 
-async def get_latest_camera_frame() -> bytes:
+async def get_latest_camera_frame(camera_id: int) -> bytes:
     """Return a JPEG frame read from the shared upstream stream."""
-    _ensure_shared_camera_stream()
-    if _latest_jpeg is None:
+    state = _get_camera_state(camera_id)
+    _ensure_shared_camera_stream(camera_id)
+    if state.latest_jpeg is None:
         try:
             await asyncio.wait_for(
-                _frame_available.wait(), timeout=CAMERA_CAPTURE_READ_TIMEOUT_S
+                state.frame_available.wait(), timeout=CAMERA_CAPTURE_READ_TIMEOUT_S
             )
         except TimeoutError as exc:
             raise RuntimeError(
-                "Camera stream timed out while waiting for a JPEG frame"
+                f"Camera {camera_id} stream timed out while waiting for a JPEG frame"
             ) from exc
 
-    if _latest_jpeg is None:
-        raise RuntimeError("Camera stream did not provide a JPEG frame")
-    return _latest_jpeg
+    if state.latest_jpeg is None:
+        raise RuntimeError(f"Camera {camera_id} stream did not provide a JPEG frame")
+    return state.latest_jpeg
 
 
-async def record_video(camera_position: CamaraPosition) -> CamaraSaveStatus:
+async def record_video(camera_id: int, camera_position: CamaraPosition) -> CamaraSaveStatus:
     """Encode 30 wall-clock seconds of frames from the shared stream into an MP4."""
     ffmpeg_command = _resolve_ffmpeg_command()
     if ffmpeg_command is None:
         raise RuntimeError("FFmpeg is not installed or is not available on PATH")
 
+    state = _get_camera_state(camera_id)
     RECORDING_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{camera_position.camera}_{timestamp}.mp4"
     filepath = RECORDING_DIR / filename
     frame_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=RECORDING_FPS * 2)
-    _recording_subscribers.add(frame_queue)
-    _ensure_shared_camera_stream()
+    state.recording_subscribers.add(frame_queue)
+    _ensure_shared_camera_stream(camera_id)
 
     try:
         process = await asyncio.create_subprocess_exec(
@@ -271,7 +297,7 @@ async def record_video(camera_position: CamaraPosition) -> CamaraSaveStatus:
                 recording_error.__cause__ = exc
                 break
     finally:
-        _recording_subscribers.discard(frame_queue)
+        state.recording_subscribers.discard(frame_queue)
         if process.stdin is not None:
             process.stdin.close()
 
@@ -299,15 +325,24 @@ async def record_video(camera_position: CamaraPosition) -> CamaraSaveStatus:
     )
 
 
-def is_camera_online() -> bool:
-    return _camera_online or _active_streams > 0
+def is_camera_online(camera_id: int) -> bool:
+    state = _get_camera_state(camera_id)
+    return state.online or state.active_streams > 0
 
 
 def get_camera_status() -> dict:
-    online = is_camera_online()
+    """Return status for both cameras."""
+    camera_1_online = is_camera_online(1)
+    camera_2_online = is_camera_online(2)
     return {
-        "is_streaming": online,
-        "source": "192.168.1.3" if online else "none",
+        "camera_1": {
+            "is_streaming": camera_1_online,
+            "source": settings.camera_1_url,
+        },
+        "camera_2": {
+            "is_streaming": camera_2_online,
+            "source": settings.camera_2_url,
+        },
     }
 
 
@@ -333,12 +368,16 @@ def save_snapshot_bytes(
     )
 
 
-async def capture_snapshot(camera_position: CamaraPosition) -> CamaraSaveStatus:
+async def capture_snapshot(camera_id: int, camera_position: CamaraPosition) -> CamaraSaveStatus:
     """Read one JPEG frame from the camera stream and save its byte content.
 
     The requested camera position is carried through to the saved capture status.
     Raises RuntimeError if the camera stream is unavailable.
     """
-    logger.info("Capturing snapshot for camera position: %s", camera_position.camera)
-    jpeg_data = await get_latest_camera_frame()
+    logger.info(
+        "Capturing snapshot for camera %s position: %s",
+        camera_id,
+        camera_position.camera,
+    )
+    jpeg_data = await get_latest_camera_frame(camera_id)
     return save_snapshot_bytes(jpeg_data, camera_position)

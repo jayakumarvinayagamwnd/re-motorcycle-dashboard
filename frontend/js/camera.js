@@ -139,7 +139,7 @@ function renderCameraStatus(isStreaming, cameraId, source, streamUrl) {
   const liveDot = liveIndicator?.querySelector(".live-dot");
 
   if (streamNode) {
-    if (streamUrl) {
+    if (isStreaming && streamUrl) {
       // Only set src once so the browser doesn't reload the MJPEG stream on every poll
       if (streamNode.src !== streamUrl) {
         streamNode.src = streamUrl;
