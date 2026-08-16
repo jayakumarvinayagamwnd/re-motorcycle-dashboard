@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#062a27;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#031615;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00c49a;stop-opacity:0.55" />
+      <stop offset="100%" style="stop-color:#00a982;stop-opacity:0.35" />
+    </linearGradient>
+  </defs>
+  <rect width="320" height="240" fill="url(#bg)" />
+  <rect x="0.5" y="0.5" width="319" height="239" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
+  <g transform="translate(160, 100)">
+    <circle cx="0" cy="0" r="42" fill="url(#iconGrad)" stroke="rgba(0,214,163,0.30)" stroke-width="1.5" />
+    <g fill="none" stroke="#00d6a3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85">
+      <rect x="-22" y="-15" width="30" height="22" rx="3" />
+      <path d="M -22 -9 L -12 -9" />
+      <path d="M 8 -15 L 14 -9 L 8 -9 Z" />
+      <circle cx="-7" cy="-4" r="5" />
+      <path d="M -7 -7 L -7 -1" />
+      <path d="M -10 -4 L -4 -4" />
+    </g>
+    <line x1="-16" y1="18" x2="16" y2="-18" stroke="#ff6868" stroke-width="3" stroke-linecap="round" opacity="0.9" />
+  </g>
+  <text x="160" y="170" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="2" fill="rgba(255,255,255,0.55)">NO STREAMING</text>
+  <text x="160" y="190" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="9" letter-spacing="1" fill="rgba(255,255,255,0.30)">Camera feed unavailable</text>
+</svg>
