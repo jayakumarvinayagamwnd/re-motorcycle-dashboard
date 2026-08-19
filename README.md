@@ -25,7 +25,6 @@ motorcycle-dashboard/
 │   ├── index.html
 │   ├── css/
 │   ├── js/
-│   ├── components/
 │   └── assets/
 ├── data/
 ├── scripts/
@@ -129,3 +128,5 @@ Default values are in `.env` and `.env.example`:
 
 - `APP_NAME`
 - `APP_VERSION`
+- `CAMERA_1_URL` — MJPEG stream URL for the front camera
+- `CAMERA_2_URL` — MJPEG stream URL for the rear camera

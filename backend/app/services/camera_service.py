@@ -327,7 +327,7 @@ async def record_video(camera_id: int, camera_position: CamaraPosition) -> Camar
 
 def is_camera_online(camera_id: int) -> bool:
     state = _get_camera_state(camera_id)
-    return state.online or state.active_streams > 0
+    return state.online
 
 
 def get_camera_status() -> dict:
