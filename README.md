@@ -1,96 +1,201 @@
 # Motorcycle Dashboard
 
-Motorcycle dashboard starter project with:
+A full-stack motorcycle dashboard system featuring a **FastAPI backend**, a **static web dashboard frontend**, **ESP32 device firmware placeholders**, and **kiosk deployment** configuration for Raspberry Pi / Linux.
 
-- FastAPI backend for telemetry, GPS, trip, camera, and websocket data
-- Static frontend dashboard shell
-- Service and system script placeholders for kiosk deployment
+The system handles telemetry (speed, RPM, fuel), GPS location, live MJPEG camera streaming with snapshot capture and 30-second recording, trip tracking/history, a media gallery, and a real-time WebSocket channel.
+
+---
+
+## Features
+
+- **FastAPI backend** exposing REST endpoints for telemetry, GPS, cameras, trips, and a WebSocket channel
+- **Live camera streaming** — MJPEG streams are proxied through the backend (avoids CORS / mixed-content issues) via a shared upstream connection with single-slot per camera
+- **Snapshot capture & video recording** — Capture JPEGs from live feeds (saved to `data/capture/`) or record 30-second MP4 clips via FFmpeg (saved to `data/recordings/`)
+- **Media gallery** — Browse captured images and recorded videos with a lightbox overlay
+- **Static frontend dashboard** — Single-page UI with speedometer, RPM, fuel/battery, GPS coordinates, current trip, and nine smart cards
+- **Multiple views** — Home, Gallery, Live Google Map, Trip History, Settings (camera status + theme picker)
+- **Theme system** — 6 selectable themes (Emerald, Ocean, Violet, Sunset, Rose, Slate), persisted in `localStorage`
+- **WebSocket support** — `/ws/dashboard` echo channel, used for real-time push
+- **Kiosk deployment** — systemd unit + Chromium kiosk autostart files for dedicated display use
+- **Dev scripts** — start/stop API and dashboard with PID/log management
+
+---
 
 ## Project Structure
 
 ```text
 motorcycle-dashboard/
-├── backend/
+├── backend/                  # FastAPI backend
 │   ├── app/
-│   │   ├── api/
-│   │   ├── communication/
-│   │   ├── config/
-│   │   ├── models/
-│   │   ├── services/
-│   │   ├── websocket/
-│   │   └── main.py
-│   ├── requirements.txt
-│   └── run.py
+│   │   ├── api/              # REST routers (telemetry, gps, camera, trip)
+│   │   ├── communication/    # MQTT & Serial client stubs (future integration)
+│   │   ├── config/          # Pydantic-settings (env-driven)
+│   │   ├── models/          # Pydantic request/response models
+│   │   ├── services/        # Business logic + camera monitor service
+│   │   ├── websocket/       # /ws/dashboard WebSocket endpoint
+│   │   └── main.py          # App factory + CORS + lifespan
+│   ├── requirements.txt      # Python dependencies
+│   └── run.py                # uvicorn entry point
 ├── frontend/
-│   ├── index.html
-│   ├── css/
-│   ├── js/
-│   ├── components/
-│   └── assets/
-├── data/
-├── scripts/
+│   ├── index.html            # Single-page dashboard markup
+│   ├── css/dashboard.css     # Dashboard styles + theme overrides
+│   ├── js/                   # Polling + rendering modules
+│   └── assets/               # Icons, backgrounds, SVG placeholders
+├── devices/
+│   ├── esp32-c6/             # Placeholder — future ESP32-C6 firmware
+│   └── esp32-s3-camera/      # Placeholder — future ESP32-S3 camera firmware
+├── scripts/                  # Bash helpers for dev/run lifecycle
 ├── system/
-├── tests/
-├── .env
+│   ├── chromium-kiosk.desktop    # Kiosk autostart file
+│   └── motorcycle-dashboard.service  # Systemd unit file
+├── tests/                    # Pytest suite (test_telemetry, test_websocket)
+├── data/                     # Runtime data (SQLite db, captures, recordings)
+├── .env.example              # Environment variable template
 └── .gitignore
 ```
 
-## Backend Setup
+---
 
-1. Create and activate a virtual environment.
-2. Install dependencies:
+## Backend
+
+### Tech Stack
+
+- **FastAPI** — API framework
+- **Uvicorn** — ASGI server
+- **pydantic-settings** — environment-driven config
+- **httpx** — MJPEG stream proxying and camera health checks
+- **FFmpeg** — Video recording encoder (installed externally)
+
+### Configuration
+
+Settings are defined in `backend/app/config/settings.py` and can be overridden via a `.env` file or environment variables:
+
+| Variable                     | Default                    | Description                    |
+|------------------------------|---------------------------|--------------------------------|
+| `APP_NAME`                   | `Motorcycle Dashboard API` | Application name shown in docs |
+| `APP_VERSION`                | `0.1.0`                   | API version                    |
+| `CAMERA_1_URL`               | `http://192.168.1.8/camera/stream` | Camera 1 (front) MJPEG URL  |
+| `CAMERA_2_URL`               | `http://192.168.1.6/camera/stream` | Camera 2 (rear) MJPEG URL   |
+
+Copy `.env.example` to `.env` and adjust as needed:
+
+```bash
+cp .env.example .env
+```
+
+### API Endpoints
+
+| Method | Path                       | Description                                        |
+|--------|----------------------------|---------------------------------------------------|
+| GET    | `/`                        | Root info                                         |
+| GET    | `/api/health`              | Health check (`{"status":"ok"}`)                     |
+| GET    | `/api/telemetry/latest`    | Latest telemetry (speed, RPM, fuel)                 |
+| GET    | `/api/gps/latest`          | Latest GPS coordinates (lat, lon, altitude)          |
+| GET    | `/api/camera/status`       | Streaming status for camera 1 & 2                    |
+| GET    | `/api/camera/gallery`      | List of saved captures and recordings (newest first) |
+| GET    | `/api/camera/gallery/{media_type}/{filename}` | Serve one gallery file (images/videos) |
+| GET    | `/api/camera/{id}/stream`  | Proxied MJPEG stream (id = 1 or 2)                   |
+| POST   | `/api/camera/{id}/capture` | Save a JPEG snapshot                                  |
+| POST   | `/api/camera/{id}/record`  | Record 30 seconds of video                           |
+| GET    | `/api/trip/current`        | Current trip data                                    |
+| GET    | `/api/trip/history`        | Historic trips                                      |
+| WS     | `/ws/dashboard`            | WebSocket echo/event channel                         |
+
+### Camera System
+
+- `services/camera_service.py` manages two cameras with runtime state:
+  - A **shared upstream MJPEG connection** per camera — only one connection is opened and all browser/fullscreen/recording consumers receive the same bytes. This avoids competing with each camera's limited simultaneous-connection support.
+  - Frame buffering → JPEG frame extraction — incoming chunks are searched for `SOI`/`EOI` markers so snapshots are always complete JPEGs.
+  - Connectivity monitoring — background task probes camera availability every 5 seconds (skipped while streams are active).
+- The frontend polls `/api/camera/status` every 2s to toggle streams and placeholders.
+- `POST /api/camera/{id}/capture` reads the latest frame and saves it to `data/captures/*.jpg`.
+- `POST /api/camera/{id}/record` feeds 20 FPS JPEGs to a 30-second FFmpeg `libx264` encode, then saves the MP4 to `data/recordings/`.
+
+### WebSocket
+
+`/ws/dashboard` accepts a connection and echoes any received message back as `echo:<message>`. This is a placeholders feed channel — the frontend `websocket.js` provides the connection helper.
+
+### Communication Stubs
+
+`app/communication/mqtt_client.py` and `serial_client.py` are placeholder classes for future MQTT and serial (e.g., UART from the bike's ECU) integration. They currently implement no-ops.
+
+---
+
+## Frontend
+
+The dashboard is a static web app that runs from `frontend/index.html` and talks to the FastAPI backend on port `8000`.
+
+### Views
+
+| View           | Description                                               |
+|----------------|-----------------------------------------------------------|
+| Home           | Camera feeds + speed, RPM, battery, GPS, trip cards        |
+| Gallery        | Saved snapshots and video recordings                      |
+| Google Map     | Live-embedded map at the current GPS coordinates           |
+| Trip History   | List of past trips from the API                            |
+| Settings       | Camera binding info + theme picker (6 themes)              |
+
+The dashboard uses a custom **glassmorphism** dark theme on the Royal Enfield background, with 6 selectable themes persisted in `localStorage`.
+
+### JavaScript Modules
+
+| File            | Responsibility                                            |
+|-----------------|-------------------------------------------------------|
+| `app.js`        | Polling loops (telemetry/ gps/ camera/ trip/ trip-history) + data application |
+| `camera.js`     | Stream URL management, capture/record/fullscreen/status rendering  |
+| `gallery.js`    | Loads and renders the images/videos gallery, overlay handling   |
+| `navigation.js` | Nav toggle + section switching                          |
+| `speedometer.js`| Renders the current speed value                        |
+| `trip.js`       | Renders current trip + trip history                    |
+| `websocket.js`  | Opens the `/ws/dashboard` WebSocket channel            |
+
+---
+
+## Running the Project
+
+### Prerequisites
+
+- **Python 3.10+**
+- **FFmpeg** (for video recording; optional for telemetry/GPS — the app will fail only when recording)
+  - Windows: `winget install Gyan.FFmpeg` or via Chocolatey
+  - Linux/Mac: `sudo apt install ffmpeg` / `brew install ffmpeg`
+- **Node.js (not required)** for serving static files — any static file server works; Python's `http.server` is used in the scripts.
+
+### 1. Create & activate a virtual environment
+
+**Windows (PowerShell):**
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+**Linux/macOS (bash):**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 2. Install backend dependencies
 
 ```bash
 pip install -r backend/requirements.txt
 ```
 
-## Windows Quick Start (PowerShell)
+### 3. Configure environment
 
-Run from the project root:
-
-```powershell
-Set-Location "G:\git\motorcycle-dashboard"
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r backend\requirements.txt
-python backend\run.py
+```bash
+cp .env.example .env    # adjust CAMERA_1_URL / CAMERA_2_URL as needed
 ```
 
-In a second PowerShell terminal (with the same venv activated), run tests:
-
-```powershell
-Set-Location "G:\git\motorcycle-dashboard"
-.\.venv\Scripts\Activate.ps1
-pytest
-```
-
-If script execution is blocked:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-
-cmd.exe alternative:
-
-```bat
-cd /d G:\git\motorcycle-dashboard
-python -m venv .venv
-.venv\Scripts\activate.bat
-python -m pip install --upgrade pip
-pip install -r backend\requirements.txt
-python backend\run.py
-```
-
-## Run Backend
-
-Option 1:
+### 4. Start the backend API
 
 ```bash
 python backend/run.py
 ```
 
-Option 2:
+Or with uvicorn directly:
 
 ```bash
 uvicorn backend.app.main:app --reload
@@ -99,33 +204,100 @@ uvicorn backend.app.main:app --reload
 Backend URL: `http://localhost:8000`
 
 API docs:
-
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
-## Frontend
+### 5. Start the frontend
 
-Open `frontend/index.html` directly in a browser, or serve `frontend/` with any static file server.
+Serve `frontend/` with any static file server — the included scripts use Python's built-in server on port **5500**:
 
-## Available Endpoints
+```bash
+python -m http.server 5500 --directory frontend
+```
 
-- `GET /`
-- `GET /api/health`
-- `GET /api/telemetry/latest`
-- `GET /api/gps/latest`
-- `GET /api/camera/status`
-- `GET /api/trip/current`
-- `WS /ws/dashboard`
+Open `http://localhost:5500`.
 
-## Run Tests
+---
+
+## Dev Scripts (Bash / PowerShell)
+
+The scripts directory contains cross-platform start/stop helpers that write PID files to `.run/`:
+
+| Script                    | Action                                   |
+|---------------------------|------------------------------------------|
+| `scripts/start-dev-api.sh`  | Start FastAPI on port 8000 (`uvicorn`)   |
+| `scripts/start-dashboard.sh`| Serve frontend on port 5500              |
+| `scripts/start-dev.sh`      | Start API, wait, then serve dashboard     |
+| `scripts/stop-dev-api.sh` | Stop the API process                      |
+| `scripts/stop-dashboard.sh`  | Stop the dashboard process                |
+| `scripts/stop-dev.sh`      | Stop both                                 |
+
+```bash
+# One-shot dev environment
+bash scripts/start-dev.sh
+# teardown
+bash scripts/stop-dev.sh
+```
+
+---
+
+## Testing
+
+Run the pytest suite locally:
 
 ```bash
 pytest
 ```
 
+Integration smoke tests are in `tests/`:
+
+- `test_telemetry.py` — verifies `GET /api/telemetry/latest` returns speed/RPM fields
+- `test_websocket.py` — verifies `/ws/dashboard` echo and `/api/health`
+
+---
+
+## Kiosk Deployment (Raspberry Pi)
+
+### `~/.config/autostart/chromium-kiosk.desktop`
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Motorcycle Dashboard Kiosk
+Exec=chromium --kiosk --noerrdialogs --disable-infobars http://localhost:5500
+X-GNOME-Autostart-enabled=true
+```
+
+### systemd service unit — `system/motorcycle-dashboard.service`
+
+Place in `/etc/systemd/system/motorcycle-dashboard.service` and adjust `WorkingDirectory` / `ExecStart` paths. It launches the backend as `pi` user and restarts on failure.
+
+---
+
+## Development Roadmap / Placeholders
+
+The following areas are **stubs** awaiting implementation:
+
+- `backend/app/communication/mqtt_client.py` — MQTT client stub
+- `backend/app/communication/serial_client.py` — Serial client stub
+- `devices/esp32-c6/` — Host-side firmware directory for the ESP32-C6 (future integration)
+- `devices/esp32-s3-camera/` — Host-side firmware directory for the ESP32-S3 camera module
+
+---
+
 ## Environment Variables
 
-Default values are in `.env` and `.env.example`:
+Copy `.env.example` to `.env` and adjust:
 
-- `APP_NAME`
-- `APP_VERSION`
+| Variable      | Purpose                               |
+|---------------|---------------------------------------|
+| `APP_NAME`    | App name (shown in FastAPI title)      |
+| `APP_VERSION` | Version string                        |
+| `CAMERA_1_URL`| Camera 1 (front) MJPEG stream URL      |
+| `CAMERA_2_URL`| Camera 2 (rear) MJPEG stream URL       |
+
+---
+
+## License
+
+*(No license specified — all rights reserved unless otherwise noted.)*
