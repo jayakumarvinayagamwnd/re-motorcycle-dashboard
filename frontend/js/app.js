@@ -128,7 +128,12 @@ function applyTheme(theme) {
 }
 
 function applyTrip(data) {
-  renderTrip(data.distance_km, data.duration_min);
+  const trip = data.trip;
+  if (trip) {
+    renderTrip(trip.distance_km, trip.duration_sec / 60);
+  } else {
+    renderTrip(0, 0);
+  }
 }
 
 function applyTripHistory(data) {
