@@ -28,11 +28,12 @@ function renderTripHistory(data) {
 
   container.innerHTML = data.map((trip) => {
     const km = Number(trip.distance_km).toFixed(1);
+    const date = trip.started_at ? trip.started_at.slice(0, 10) : "";
     return `
       <div class="trip-history-item">
-        <span class="trip-history-name">${escapeHtml(trip.trim_name)}</span>
+        <span class="trip-history-name">${escapeHtml(trip.trip_name)}</span>
         <span class="trip-history-km">${km} <small>km</small></span>
-        <span class="trip-history-date">${escapeHtml(trip.date)}</span>
+        <span class="trip-history-date">${escapeHtml(date)}</span>
       </div>
     `;
   }).join("");

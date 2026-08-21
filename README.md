@@ -30,6 +30,7 @@ motorcycle-dashboard/
 │   │   ├── api/              # REST routers (telemetry, gps, camera, trip)
 │   │   ├── communication/    # MQTT & Serial client stubs (future integration)
 │   │   ├── config/          # Pydantic-settings (env-driven)
+│   │   ├── database.py      # SQLite connection + schema init + health check
 │   │   ├── models/          # Pydantic request/response models
 │   │   ├── services/        # Business logic + camera monitor service
 │   │   ├── websocket/       # /ws/dashboard WebSocket endpoint
@@ -76,6 +77,7 @@ Settings are defined in `backend/app/config/settings.py` and can be overridden v
 | `APP_VERSION`                | `0.1.0`                   | API version                    |
 | `CAMERA_1_URL`               | `http://192.168.1.8/camera/stream` | Camera 1 (front) MJPEG URL  |
 | `CAMERA_2_URL`               | `http://192.168.1.6/camera/stream` | Camera 2 (rear) MJPEG URL   |
+| `DATABASE_PATH`              | `data/motorcycle.db`      | SQLite database file path     |
 
 Copy `.env.example` to `.env` and adjust as needed:
 
@@ -89,6 +91,7 @@ cp .env.example .env
 |--------|----------------------------|---------------------------------------------------|
 | GET    | `/`                        | Root info                                         |
 | GET    | `/api/health`              | Health check (`{"status":"ok"}`)                     |
+| GET    | `/healthcheck/db`          | Database health (inserts + verifies a `db_check` row) |
 | GET    | `/api/telemetry/latest`    | Latest telemetry (speed, RPM, fuel)                 |
 | GET    | `/api/gps/latest`          | Latest GPS coordinates (lat, lon, altitude)          |
 | GET    | `/api/camera/status`       | Streaming status for camera 1 & 2                    |
@@ -97,7 +100,11 @@ cp .env.example .env
 | GET    | `/api/camera/{id}/stream`  | Proxied MJPEG stream (id = 1 or 2)                   |
 | POST   | `/api/camera/{id}/capture` | Save a JPEG snapshot                                  |
 | POST   | `/api/camera/{id}/record`  | Record 30 seconds of video                           |
-| GET    | `/api/trip/current`        | Current trip data                                    |
+| GET    | `/api/trip/current`        | Current ACTIVE trip (or `{"trip": null}`)            |
+| GET    | `/api/trip/startup`        | Startup state (unfinished trip or last completed)    |
+| POST   | `/api/trip/start`          | Start a new trip (201 Created, 409 if active)        |
+| POST   | `/api/trip/{id}/pause`     | Pause an ACTIVE trip (409 if not ACTIVE)             |
+| POST   | `/api/trip/{id}/finish`    | Finish an ACTIVE/PAUSED trip -> COMPLETED            |
 | GET    | `/api/trip/history`        | Historic trips                                      |
 | WS     | `/ws/dashboard`            | WebSocket echo/event channel                         |
 
@@ -110,6 +117,202 @@ cp .env.example .env
 - The frontend polls `/api/camera/status` every 2s to toggle streams and placeholders.
 - `POST /api/camera/{id}/capture` reads the latest frame and saves it to `data/captures/*.jpg`.
 - `POST /api/camera/{id}/record` feeds 20 FPS JPEGs to a 30-second FFmpeg `libx264` encode, then saves the MP4 to `data/recordings/`.
+
+### Database
+
+The backend uses a **SQLite** database (`data/motorcycle.db` by default) for trip storage:
+
+- `backend/app/database.py` manages the connection, schema initialization, and health checks.
+- The `trips` table is created automatically on startup (or on module import).
+- The trip service reads current trip and history data from the database.
+- `GET /healthcheck/db` performs a full health check: it opens SQLite, inserts a row into the `db_check` table, selects it back to verify, and returns the health status via the `DBHealthResponse` model:
+
+**Trips table schema:**
+
+```sql
+CREATE TABLE trips (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trip_name TEXT NOT NULL,
+    status TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    distance_km REAL NOT NULL DEFAULT 0.0,
+    duration_sec INTEGER NOT NULL DEFAULT 0,
+    avg_speed_kmh REAL NOT NULL DEFAULT 0.0,
+    max_speed_kmh REAL NOT NULL DEFAULT 0.0,
+    start_latitude REAL,
+    start_longitude REAL,
+    end_latitude REAL,
+    end_longitude REAL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+```
+
+**`GET /api/trip/current`** returns the most recent ACTIVE trip via the `CurrentTripResponse` model:
+
+**200 OK — Active trip:**
+
+```json
+{
+  "trip": {
+    "id": 10,
+    "trip_name": "Morning Commute",
+    "status": "ACTIVE",
+    "started_at": "2026-08-20T07:30:00+05:30",
+    "distance_km": 22.31,
+    "duration_sec": 3120,
+    "avg_speed_kmh": 25.78,
+    "max_speed_kmh": 72.4
+  }
+}
+```
+
+**200 OK — No active trip:**
+
+```json
+{
+  "trip": null
+}
+```
+
+**`POST /api/trip/start`** starts a new trip via the `TripStartRequest` / `TripStartResponse` models:
+
+**201 Created:**
+
+```json
+{
+  "id": 11,
+  "trip_name": "Morning Commute",
+  "status": "ACTIVE",
+  "started_at": "2026-08-20T07:30:00+05:30",
+  "distance_km": 0.0,
+  "duration_sec": 0,
+  "avg_speed_kmh": 0.0,
+  "max_speed_kmh": 0.0
+}
+```
+
+**409 Conflict — Another trip is already active:**
+
+```json
+{
+  "error": "TRIP_ALREADY_ACTIVE",
+  "message": "Trip 10 is already active."
+}
+```
+
+**`POST /api/trip/{id}/pause`** pauses an ACTIVE trip via the `TripPauseResponse` model:
+
+**200 OK:**
+
+```json
+{
+  "id": 11,
+  "status": "PAUSED",
+  "distance_km": 22.31,
+  "duration_sec": 3120,
+  "avg_speed_kmh": 25.78
+}
+```
+
+**409 Conflict — Trip is not ACTIVE:**
+
+```json
+{
+  "error": "TRIP_NOT_ACTIVE",
+  "message": "Trip 11 is not active (status: PAUSED)."
+}
+```
+
+**`POST /api/trip/{id}/finish`** finishes an ACTIVE or PAUSED trip via the `TripFinishResponse` model:
+
+**200 OK:**
+
+```json
+{
+  "id": 11,
+  "trip_name": "Morning Commute",
+  "status": "COMPLETED",
+  "started_at": "2026-08-20T07:30:00+05:30",
+  "ended_at": "2026-08-20T08:25:32+05:30",
+  "distance_km": 42.71,
+  "duration_sec": 3332,
+  "avg_speed_kmh": 46.12,
+  "max_speed_kmh": 82.4
+}
+```
+
+**409 Conflict — Trip is not ACTIVE or PAUSED:**
+
+```json
+{
+  "error": "TRIP_NOT_FINISHABLE",
+  "message": "Trip 11 cannot be finished (status: COMPLETED)."
+}
+```
+
+**`GET /api/trip/startup`** returns the startup state via the `TripStartupResponse` model:
+
+**200 OK — No unfinished trip (READY):**
+
+```json
+{
+  "state": "READY",
+  "current_trip": null,
+  "previous_trip": {
+    "id": 9,
+    "trip_name": "Evening Ride",
+    "status": "COMPLETED",
+    "date": "2026-08-19"
+  }
+}
+```
+
+**200 OK — Unfinished trip (CONTINUE_OR_NEW):**
+
+```json
+{
+  "state": "CONTINUE_OR_NEW",
+  "current_trip": {
+    "id": 9,
+    "trip_name": "Evening Ride",
+    "status": "PAUSED",
+    "distance_km": 72.42
+  }
+}
+```
+
+**503 Service Unavailable — Database error:**
+
+```json
+{
+  "status": "unhealthy",
+  "database": "sqlite",
+  "error": "Database health check failed"
+}
+```
+
+**200 OK — Healthy:**
+
+```json
+{
+  "status": "healthy",
+  "database": "sqlite",
+  "check_date": "2026-08-20T23:30:00+05:30",
+  "created_by": "healthcheck"
+}
+```
+
+**503 Service Unavailable — Unhealthy:**
+
+```json
+{
+  "status": "unhealthy",
+  "database": "sqlite",
+  "error": "Database health check failed"
+}
+```
 
 ### WebSocket
 
@@ -251,6 +454,7 @@ pytest
 
 Integration smoke tests are in `tests/`:
 
+- `test_database.py` — verifies `/healthcheck/db`, `/api/trip/current`, `/api/trip/startup`, and `/api/trip/history`
 - `test_telemetry.py` — verifies `GET /api/telemetry/latest` returns speed/RPM fields
 - `test_websocket.py` — verifies `/ws/dashboard` echo and `/api/health`
 
@@ -295,6 +499,7 @@ Copy `.env.example` to `.env` and adjust:
 | `APP_VERSION` | Version string                        |
 | `CAMERA_1_URL`| Camera 1 (front) MJPEG stream URL      |
 | `CAMERA_2_URL`| Camera 2 (rear) MJPEG stream URL       |
+| `DATABASE_PATH`| SQLite database file path             |
 
 ---
 
