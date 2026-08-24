@@ -130,6 +130,27 @@ def test_trip_pause_conflict() -> None:
     assert f"Trip {trip_id} is not active" in data["message"]
 
 
+def test_trip_resume_paused() -> None:
+    _clear_trips()
+    trip_id = _insert_trip("Morning Commute", "PAUSED", 22.31)
+    response = client.post(f"/api/trip/{trip_id}/resume")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == trip_id
+    assert data["status"] == "ACTIVE"
+    assert data["distance_km"] == 22.31
+
+
+def test_trip_resume_conflict() -> None:
+    _clear_trips()
+    trip_id = _insert_trip("Already Active", "ACTIVE", 5.0)
+    response = client.post(f"/api/trip/{trip_id}/resume")
+    assert response.status_code == 409
+    data = response.json()
+    assert data["error"] == "TRIP_NOT_PAUSED"
+    assert f"Trip {trip_id} is not paused" in data["message"]
+
+
 def test_trip_finish_active() -> None:
     _clear_trips()
     trip_id = _insert_trip("Morning Commute", "ACTIVE", 42.71)

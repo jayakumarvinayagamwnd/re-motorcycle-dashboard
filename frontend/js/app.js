@@ -14,6 +14,7 @@ const TRIP_HISTORY_INTERVAL_MS = 10000;
 document.addEventListener("DOMContentLoaded", () => {
   initialiseCameraSettings();
   initialiseThemeSettings();
+  initialiseTripStartControls();
   // Start separate polling loop per endpoint so slow endpoints don't block others
   startPolling("telemetry", TELEMETRY_API, TELEMETRY_INTERVAL_MS, applyTelemetry);
   startPolling("gps", GPS_API, GPS_INTERVAL_MS, applyGps);
@@ -129,11 +130,7 @@ function applyTheme(theme) {
 
 function applyTrip(data) {
   const trip = data.trip;
-  if (trip) {
-    renderTrip(trip.distance_km, trip.duration_sec / 60);
-  } else {
-    renderTrip(0, 0);
-  }
+  renderTrip(trip);
 }
 
 function applyTripHistory(data) {

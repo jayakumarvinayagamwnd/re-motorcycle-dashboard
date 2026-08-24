@@ -75,7 +75,7 @@ Settings are defined in `backend/app/config/settings.py` and can be overridden v
 |------------------------------|---------------------------|--------------------------------|
 | `APP_NAME`                   | `Motorcycle Dashboard API` | Application name shown in docs |
 | `APP_VERSION`                | `0.1.0`                   | API version                    |
-| `CAMERA_1_URL`               | `http://192.168.1.8/camera/stream` | Camera 1 (front) MJPEG URL  |
+| `CAMERA_1_URL`               | `http://192.168.1.7/camera/stream` | Camera 1 (front) MJPEG URL  |
 | `CAMERA_2_URL`               | `http://192.168.1.6/camera/stream` | Camera 2 (rear) MJPEG URL   |
 | `DATABASE_PATH`              | `data/motorcycle.db`      | SQLite database file path     |
 
@@ -104,6 +104,7 @@ cp .env.example .env
 | GET    | `/api/trip/startup`        | Startup state (unfinished trip or last completed)    |
 | POST   | `/api/trip/start`          | Start a new trip (201 Created, 409 if active)        |
 | POST   | `/api/trip/{id}/pause`     | Pause an ACTIVE trip (409 if not ACTIVE)             |
+| POST   | `/api/trip/{id}/resume`    | Resume a PAUSED trip (409 if not PAUSED)             |
 | POST   | `/api/trip/{id}/finish`    | Finish an ACTIVE/PAUSED trip -> COMPLETED            |
 | GET    | `/api/trip/history`        | Historic trips                                      |
 | WS     | `/ws/dashboard`            | WebSocket echo/event channel                         |

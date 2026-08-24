@@ -6,6 +6,7 @@ from ..models.trip import (
     Trip,
     TripFinishResponse,
     TripPauseResponse,
+    TripResumeResponse,
     TripStartRequest,
     TripStartResponse,
     TripStartupCurrentTrip,
@@ -38,6 +39,15 @@ class TripNotFinishableError(Exception):
         self.trip_id = trip_id
         self.current_status = current_status
         super().__init__(f"Trip {trip_id} cannot be finished (status: {current_status}).")
+
+
+class TripNotPausedError(Exception):
+    """Raised when trying to resume a trip that is not PAUSED."""
+
+    def __init__(self, trip_id: int, current_status: str):
+        self.trip_id = trip_id
+        self.current_status = current_status
+        super().__init__(f"Trip {trip_id} is not paused (status: {current_status}).")
 
 
 def get_current_trip() -> CurrentTripResponse:
@@ -197,6 +207,45 @@ def pause_trip(trip_id: int) -> TripPauseResponse:
     return TripPauseResponse(
         id=row["id"],
         status="PAUSED",
+        distance_km=row["distance_km"],
+        duration_sec=row["duration_sec"],
+        avg_speed_kmh=row["avg_speed_kmh"],
+    )
+
+
+def resume_trip(trip_id: int) -> TripResumeResponse:
+    """Resume a PAUSED trip. Raises TripNotPausedError if it is not PAUSED."""
+    now = datetime.now().astimezone().isoformat()
+
+    with get_db_connection() as conn:
+        cursor = conn.execute(
+            """
+            SELECT id, status, distance_km, duration_sec, avg_speed_kmh
+            FROM trips
+            WHERE id = ?
+            """,
+            (trip_id,),
+        )
+        row = cursor.fetchone()
+
+        if row is None:
+            raise TripNotPausedError(trip_id, "NOT_FOUND")
+
+        if row["status"] != "PAUSED":
+            raise TripNotPausedError(trip_id, row["status"])
+
+        conn.execute(
+            """
+            UPDATE trips
+            SET status = 'ACTIVE', updated_at = ?
+            WHERE id = ?
+            """,
+            (now, trip_id),
+        )
+
+    return TripResumeResponse(
+        id=row["id"],
+        status="ACTIVE",
         distance_km=row["distance_km"],
         duration_sec=row["duration_sec"],
         avg_speed_kmh=row["avg_speed_kmh"],

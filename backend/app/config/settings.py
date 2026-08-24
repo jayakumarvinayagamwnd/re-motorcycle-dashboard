@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
 
     # Camera stream URLs (camera 1 = front, camera 2 = rear)
-    camera_1_url: str = "http://192.168.1.8/camera/stream"
+    camera_1_url: str = "http://192.168.1.12/camera/stream"
     camera_2_url: str = "http://192.168.1.6/camera/stream"
 
     # SQLite database path (relative to project root)

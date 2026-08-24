@@ -73,6 +73,16 @@ class TripPauseResponse(BaseModel):
     avg_speed_kmh: float
 
 
+class TripResumeResponse(BaseModel):
+    """Response payload for POST /api/trip/{id}/resume."""
+
+    id: int
+    status: str
+    distance_km: float
+    duration_sec: int
+    avg_speed_kmh: float
+
+
 class TripFinishResponse(BaseModel):
     """Response payload for POST /api/trip/{id}/finish."""
     id: int

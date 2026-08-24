@@ -7,6 +7,7 @@ from ..models.trip import (
     TripConflictError,
     TripFinishResponse,
     TripPauseResponse,
+    TripResumeResponse,
     TripStartRequest,
     TripStartResponse,
     TripStartupResponse,
@@ -15,11 +16,13 @@ from ..services.trip_service import (
     TripAlreadyActiveError,
     TripNotActiveError,
     TripNotFinishableError,
+    TripNotPausedError,
     finish_trip,
     get_current_trip,
     get_trip_history,
     get_trip_startup,
     pause_trip,
+    resume_trip,
     start_trip,
 )
 
@@ -138,6 +141,43 @@ def trip_pause(trip_id: int = Path(ge=1)) -> TripPauseResponse:
             content=TripConflictError(
                 error="TRIP_NOT_ACTIVE",
                 message=f"Trip {exc.trip_id} is not active (status: {exc.current_status}).",
+            ).model_dump(),
+        )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content=DBHealthError(
+                status="unhealthy",
+                database="sqlite",
+                error="Database health check failed",
+            ).model_dump(),
+        )
+
+
+@router.post(
+    "/{trip_id}/resume",
+    response_model=TripResumeResponse,
+    responses={
+        409: {
+            "model": TripConflictError,
+            "description": "Trip is not PAUSED",
+        },
+        503: {
+            "model": DBHealthError,
+            "description": "Database health check failed",
+        },
+    },
+)
+def trip_resume(trip_id: int = Path(ge=1)) -> TripResumeResponse:
+    """Resume a PAUSED trip. Returns 409 if the trip is not PAUSED."""
+    try:
+        return resume_trip(trip_id)
+    except TripNotPausedError as exc:
+        return JSONResponse(
+            status_code=409,
+            content=TripConflictError(
+                error="TRIP_NOT_PAUSED",
+                message=f"Trip {exc.trip_id} is not paused (status: {exc.current_status}).",
             ).model_dump(),
         )
     except Exception as exc:
