@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Path
+from fastapi import APIRouter, Path, Query
 from fastapi.responses import JSONResponse
 
+from ..config.settings import settings
 from ..models.db_check import DBHealthError
 from ..models.trip import (
     CurrentTripResponse,
@@ -229,5 +230,7 @@ def trip_finish(trip_id: int = Path(ge=1)) -> TripFinishResponse:
 
 
 @router.get("/history")
-def trip_history() -> list:
-    return get_trip_history()
+def trip_history(limit: int | None = Query(default=None, ge=1, le=500)) -> list:
+    """Return the newest saved trips."""
+    history_limit = limit if limit is not None else settings.trip_history_items_limit
+    return get_trip_history(history_limit)

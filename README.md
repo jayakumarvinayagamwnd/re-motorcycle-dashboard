@@ -95,7 +95,7 @@ cp .env.example .env
 | GET    | `/api/telemetry/latest`    | Latest telemetry (speed, RPM, fuel)                 |
 | GET    | `/api/gps/latest`          | Latest GPS coordinates (lat, lon, altitude)          |
 | GET    | `/api/camera/status`       | Streaming status for camera 1 & 2                    |
-| GET    | `/api/camera/gallery`      | List of saved captures and recordings (newest first) |
+| GET    | `/api/camera/gallery`      | Up to the newest 50 saved images and 50 videos; use `?limit=N` (1–500) to override |
 | GET    | `/api/camera/gallery/{media_type}/{filename}` | Serve one gallery file (images/videos) |
 | GET    | `/api/camera/{id}/stream`  | Proxied MJPEG stream (id = 1 or 2)                   |
 | POST   | `/api/camera/{id}/capture` | Save a JPEG snapshot                                  |
@@ -106,7 +106,7 @@ cp .env.example .env
 | POST   | `/api/trip/{id}/pause`     | Pause an ACTIVE trip (409 if not ACTIVE)             |
 | POST   | `/api/trip/{id}/resume`    | Resume a PAUSED trip (409 if not PAUSED)             |
 | POST   | `/api/trip/{id}/finish`    | Finish an ACTIVE/PAUSED trip -> COMPLETED            |
-| GET    | `/api/trip/history`        | Historic trips                                      |
+| GET    | `/api/trip/history`        | Up to the newest 50 trips; use `?limit=N` (1–500) to override |
 | WS     | `/ws/dashboard`            | WebSocket echo/event channel                         |
 
 ### Camera System
