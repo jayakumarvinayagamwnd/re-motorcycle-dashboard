@@ -577,6 +577,29 @@ body.camera-overlay-open {
   gap:10px;
   flex-shrink:0
 }
+.telemetry-toggle {
+  display:none;
+  align-items:center;
+  justify-content:center;
+  width:38px;
+  height:22px;
+  padding:0;
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px 16px 0 0;
+  color:#00c49a;
+  background:rgba(8,61,55,0.95);
+  cursor:pointer;
+  transition:color 0.25s ease,background 0.25s ease,border-color 0.25s ease
+}
+.telemetry-toggle i {
+  font-size:13px;
+  transition:transform 0.25s ease
+}
+.telemetry-toggle:hover {
+  color:#00d6a3;
+  background:rgba(0,180,150,0.25);
+  border-color:rgba(0,214,163,0.40)
+}
 .speed-section {
   display:flex;
   flex-direction:column;
@@ -1148,5 +1171,74 @@ body.camera-overlay-open {
   }
   .map-container {
     border-radius:12px
+  }
+}
+/* Mobile landscape: the camera section competes with telemetry for very
+   little vertical space, so hide the telemetry row behind a toggle button
+   with two chevrons that the rider can tap open/closed on demand. */
+@media (max-height:500px) and (orientation:landscape) {
+  /* Settings can be taller than a short landscape viewport.  Keep the
+     dashboard shell fixed while allowing the active panel to scroll. */
+  #view-settings {
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+    scrollbar-color:rgba(0,196,154,0.40) transparent
+  }
+  #view-home {
+    position:relative;
+    overflow:hidden
+  }
+  .camera-section {
+    flex:1;
+    min-height:0;
+    overflow:hidden
+  }
+  .data-row {
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    z-index:20;
+    grid-template-columns:repeat(4,1fr);
+    gap:6px;
+    max-height:0;
+    padding:0 2px;
+    opacity:0;
+    overflow:hidden;
+    visibility:hidden;
+    border-radius:16px 16px 0 0;
+    background:rgba(2,20,18,0.92);
+    backdrop-filter:blur(15px);
+    -webkit-backdrop-filter:blur(15px);
+    box-shadow:0 -8px 24px rgba(0,0,0,0.35);
+    transition:max-height 0.28s ease,opacity 0.2s ease
+  }
+  .data-row.open {
+    max-height:46vh;
+    padding:6px 2px;
+    opacity:1;
+    visibility:visible;
+    overflow-y:auto
+  }
+  .speed-section,.info-card,.trip-card {
+    padding:6px 4px;
+    border-radius:10px
+  }
+  .speed-number {
+    font-size:22px
+  }
+  .telemetry-toggle {
+    display:flex;
+    position:absolute;
+    left:50%;
+    bottom:0;
+    transform:translateX(-50%);
+    z-index:21;
+    transition:bottom 0.28s ease
+  }
+  .data-row.open + .telemetry-toggle {
+    bottom:46vh
   }
 }
