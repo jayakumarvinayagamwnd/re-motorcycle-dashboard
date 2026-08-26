@@ -11,6 +11,19 @@ document.addEventListener("DOMContentLoaded", () => {
     toggle.setAttribute("aria-expanded", String(isOpen));
   });
 
+  const telemetryToggle = document.getElementById("telemetry-toggle");
+  const telemetryPanel = document.getElementById("telemetry-panel");
+  if (telemetryToggle && telemetryPanel) {
+    telemetryToggle.addEventListener("click", () => {
+      const isOpen = telemetryPanel.classList.toggle("open");
+      telemetryToggle.classList.toggle("open", isOpen);
+      telemetryToggle.setAttribute("aria-expanded", String(isOpen));
+      telemetryToggle.querySelector("i").className = isOpen
+        ? "bi bi-chevron-double-down"
+        : "bi bi-chevron-double-up";
+    });
+  }
+
   const navItems = document.querySelectorAll(".nav-item[data-view]");
   const viewSections = document.querySelectorAll(".view-section");
 

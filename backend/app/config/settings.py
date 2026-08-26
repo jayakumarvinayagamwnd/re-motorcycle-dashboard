@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     # SQLite database path (relative to project root)
     database_path: str = "data/motorcycle.db"
 
+    # Maximum number of newest items returned for each gallery media type.
+    gallery_items_limit: int = 50
+
+    # Maximum number of newest records returned by the trip-history API.
+    trip_history_items_limit: int = 50
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property

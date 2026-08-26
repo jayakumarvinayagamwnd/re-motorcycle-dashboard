@@ -298,8 +298,8 @@ def finish_trip(trip_id: int) -> TripFinishResponse:
     )
 
 
-def get_trip_history() -> list:
-    """Return all trips from the database, newest first."""
+def get_trip_history(limit: int) -> list:
+    """Return the requested number of newest trips from the database."""
     with get_db_connection() as conn:
         cursor = conn.execute(
             """
@@ -307,7 +307,9 @@ def get_trip_history() -> list:
                    duration_sec, avg_speed_kmh, max_speed_kmh
             FROM trips
             ORDER BY id DESC
-            """
+            LIMIT ?
+            """,
+            (limit,),
         )
         rows = cursor.fetchall()
 

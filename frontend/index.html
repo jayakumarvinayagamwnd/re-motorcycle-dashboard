@@ -106,7 +106,7 @@
           </div>
         </div>
         </section>
-        <section class="data-row">
+        <section class="data-row" id="telemetry-panel">
         <div class="speed-section glass-card">
           <div class="speed-value">
             <span id="speed-value" class="speed-number">
@@ -216,6 +216,9 @@
           </div>
         </div>
         </section>
+        <button type="button" class="telemetry-toggle" id="telemetry-toggle" title="Toggle telemetry panel" aria-label="Toggle telemetry panel" aria-expanded="false" aria-controls="telemetry-panel">
+          <i class="bi bi-chevron-double-up"> </i>
+        </button>
       </section>
       <section class="view-section" id="view-gallery">
         <h2> Gallery </h2>
@@ -262,6 +265,7 @@
                 <span class="camera-binding-address" id="settings-camera-1-address">Stream IP: —</span>
                 <span class="camera-binding-status" id="settings-camera-1-status"><span class="status-dot"></span>Checking status</span>
               </span>
+              <input type="radio" id="settings-camera-1" name="settings-camera" value="1" checked>
             </label>
           </div>
           <div>
@@ -271,6 +275,7 @@
                 <span class="camera-binding-address" id="settings-camera-2-address">Stream IP: —</span>
                 <span class="camera-binding-status" id="settings-camera-2-status"><span class="status-dot"></span>Checking status</span>
               </span>
+              <input type="radio" id="settings-camera-2" name="settings-camera" value="2">
             </label>
           </div>
         </div>

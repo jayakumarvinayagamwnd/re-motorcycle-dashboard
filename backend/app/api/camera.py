@@ -1,9 +1,10 @@
 import logging
 from pathlib import Path as FilePath
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Query
 from fastapi.responses import FileResponse, StreamingResponse
 
+from ..config.settings import settings
 from ..models.camara import CamaraPosition, CamaraSaveStatus
 from ..services.camera_service import (
     capture_snapshot,
@@ -27,8 +28,11 @@ def camera_status() -> dict:
 
 
 @router.get("/gallery")
-def camera_gallery() -> dict[str, list[dict[str, str]]]:
-    """Return saved captures and recordings newest first."""
+def camera_gallery(
+    limit: int | None = Query(default=None, ge=1, le=500),
+) -> dict[str, list[dict[str, str]]]:
+    """Return the newest saved captures and recordings for each media type."""
+    gallery_limit = limit if limit is not None else settings.gallery_items_limit
     gallery: dict[str, list[dict[str, str]]] = {"images": [], "videos": []}
     for media_type, directory in GALLERY_DIRECTORIES.items():
         extension = ".jpg" if media_type == "images" else ".mp4"
@@ -45,7 +49,7 @@ def camera_gallery() -> dict[str, list[dict[str, str]]]:
                 "url": f"/api/camera/gallery/{media_type}/{file.name}",
                 "created_at": file.stat().st_mtime_ns.__str__(),
             }
-            for file in files
+            for file in files[:gallery_limit]
         ]
     return gallery
 
