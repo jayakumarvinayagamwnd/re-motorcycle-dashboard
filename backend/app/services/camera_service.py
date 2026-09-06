@@ -150,13 +150,6 @@ async def _read_shared_camera_stream(state: CameraState) -> None:
 
                         state.online = True
                         async for chunk in response.aiter_bytes():
-                            for subscriber in tuple(state.stream_subscribers):
-                                try:
-                                    subscriber.put_nowait(chunk)
-                                except asyncio.QueueFull:
-                                    # A slow browser should not block the shared camera stream.
-                                    continue
-
                             frame_buffer.extend(chunk)
                             while True:
                                 jpeg_start = frame_buffer.find(b"\xff\xd8")
@@ -174,7 +167,20 @@ async def _read_shared_camera_stream(state: CameraState) -> None:
                                     break
 
                                 state.latest_jpeg = bytes(frame_buffer[jpeg_start : jpeg_end + 2])
+                                mjpeg_part = (
+                                    b"--frame\r\n"
+                                    + b"Content-Type: image/jpeg\r\n"
+                                    + f"Content-Length: {len(state.latest_jpeg)}\r\n\r\n".encode()
+                                    + state.latest_jpeg
+                                    + b"\r\n"
+                                )
                                 state.frame_available.set()
+                                for subscriber in tuple(state.stream_subscribers):
+                                    try:
+                                        subscriber.put_nowait(mjpeg_part)
+                                    except asyncio.QueueFull:
+                                        # A slow browser should not block the shared camera stream.
+                                        continue
                                 for subscriber in tuple(state.recording_subscribers):
                                     try:
                                         subscriber.put_nowait(state.latest_jpeg)
